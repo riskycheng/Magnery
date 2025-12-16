@@ -1,6 +1,7 @@
 import UIKit
 import Vision
 import CoreImage
+import CoreVideo
 
 struct SegmentationResult {
     let image: UIImage
@@ -22,66 +23,59 @@ class VisionService {
             return
         }
         
-        let request = VNGenerateForegroundInstanceMaskRequest { request, error in
-            guard error == nil else {
-                print("[VisionService] ❌ Vision 错误: \(error!.localizedDescription)")
-                completion(nil)
-                return
-            }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let request = VNGenerateForegroundInstanceMaskRequest()
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
             
-            print("[VisionService] ✓ Vision 请求完成")
-            
-            guard let result = request.results?.first as? VNInstanceMaskObservation else {
-                print("[VisionService] ❌ 未检测到前景对象")
-                completion(nil)
-                return
-            }
-            
-            print("[VisionService] ✓ 检测到 \(result.allInstances.count) 个前景对象")
-            
+            print("[VisionService] 开始执行 Vision 请求...")
             do {
-                let maskedImage = try result.generateMaskedImage(
-                    ofInstances: result.allInstances,
-                    from: VNImageRequestHandler(cgImage: cgImage),
+                try handler.perform([request])
+                print("[VisionService] ✓ Vision 请求完成")
+                
+                guard let result = request.results?.first as? VNInstanceMaskObservation else {
+                    print("[VisionService] ❌ 未检测到前景对象")
+                    DispatchQueue.main.async { completion(nil) }
+                    return
+                }
+                
+                print("[VisionService] ✓ 检测到 \(result.allInstances.count) 个前景对象")
+                
+                let instancesToUse = self.selectSubjectInstances(from: result)
+                let maskedPixelBuffer = try result.generateMaskedImage(
+                    ofInstances: instancesToUse,
+                    from: handler,
                     croppedToInstancesExtent: true
                 )
                 
-                print("[VisionService] ✓ 生成蒙版图像成功")
+                print("[VisionService] ✓ 生成前景蒙版图像成功")
                 
-                let ciImage = CIImage(cvPixelBuffer: maskedImage)
+                let ciImage = CIImage(cvPixelBuffer: maskedPixelBuffer)
                 let context = CIContext()
                 
                 if let outputCGImage = context.createCGImage(ciImage, from: ciImage.extent) {
                     let outputImage = UIImage(cgImage: outputCGImage, scale: image.scale, orientation: image.imageOrientation)
-                    print("[VisionService] ✓ 分割完成，输出图片尺寸: \(outputImage.size)")
-                    
-                    let contourPath = self.extractContour(from: outputImage)
-                    print("[VisionService] ✓ 提取轮廓路径完成")
-                    
-                    let result = SegmentationResult(image: outputImage, contourPath: contourPath)
-                    completion(result)
+                    self.finishProcessing(image: outputImage, completion: completion)
                 } else {
-                    print("[VisionService] ❌ 无法创建输出图像")
-                    completion(nil)
+                     print("[VisionService] ❌ 无法创建输出图像")
+                     DispatchQueue.main.async { completion(nil) }
                 }
-            } catch {
-                print("[VisionService] ❌ 生成蒙版图像失败: \(error)")
-                completion(nil)
-            }
-        }
-        
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            print("[VisionService] 开始执行 Vision 请求...")
-            do {
-                try handler.perform([request])
+                
             } catch {
                 print("[VisionService] ❌ 执行 Vision 请求失败: \(error)")
-                DispatchQueue.main.async {
-                    completion(nil)
-                }
+                DispatchQueue.main.async { completion(nil) }
             }
+        }
+    }
+    
+    private func finishProcessing(image: UIImage, completion: @escaping (SegmentationResult?) -> Void) {
+        print("[VisionService] ✓ 分割完成，输出图片尺寸: \(image.size)")
+        
+        let contourPath = self.extractContour(from: image)
+        print("[VisionService] ✓ 提取轮廓路径完成")
+        
+        let result = SegmentationResult(image: image, contourPath: contourPath)
+        DispatchQueue.main.async {
+            completion(result)
         }
     }
     
@@ -301,5 +295,79 @@ class VisionService {
         let path = CGMutablePath()
         path.addRect(CGRect(x: 0, y: 0, width: 1, height: 1))
         return path
+    }
+    
+    private func selectSubjectInstances(from observation: VNInstanceMaskObservation) -> IndexSet {
+        let allInstances = observation.allInstances
+        if allInstances.count <= 1 { return allInstances }
+        
+        print("[VisionService] Analyzing \(allInstances.count) instances for subject selection...")
+        
+        let mask = observation.instanceMask
+        
+        CVPixelBufferLockBaseAddress(mask, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(mask, .readOnly) }
+        
+        guard let baseAddress = CVPixelBufferGetBaseAddress(mask) else {
+            return allInstances
+        }
+        
+        let width = CVPixelBufferGetWidth(mask)
+        let height = CVPixelBufferGetHeight(mask)
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(mask)
+        
+        // Arrays to store bounding box for each instance ID (assuming IDs < 256 for UInt8 mask)
+        var minXs = [Int](repeating: Int.max, count: 256)
+        var maxXs = [Int](repeating: Int.min, count: 256)
+        var minYs = [Int](repeating: Int.max, count: 256)
+        var maxYs = [Int](repeating: Int.min, count: 256)
+        var presentIds = Set<Int>()
+        
+        // Sample every 5th pixel to speed up processing
+        let step = 5
+        for y in stride(from: 0, to: height, by: step) {
+            let row = baseAddress.advanced(by: y * bytesPerRow).assumingMemoryBound(to: UInt8.self)
+            for x in stride(from: 0, to: width, by: step) {
+                let id = Int(row[x])
+                if id == 0 { continue }
+                
+                if minXs[id] > x { minXs[id] = x }
+                if maxXs[id] < x { maxXs[id] = x }
+                if minYs[id] > y { minYs[id] = y }
+                if maxYs[id] < y { maxYs[id] = y }
+                presentIds.insert(id)
+            }
+        }
+        
+        let centerX = Double(width) / 2.0
+        let centerY = Double(height) / 2.0
+        
+        var bestId: Int?
+        var minDistance: Double = .greatestFiniteMagnitude
+        
+        for id in presentIds {
+            // Check if this ID is in the requested instances (it should be)
+            if !allInstances.contains(id) { continue }
+            
+            let boxCenterX = Double(minXs[id] + maxXs[id]) / 2.0
+            let boxCenterY = Double(minYs[id] + maxYs[id]) / 2.0
+            
+            let distSq = pow(boxCenterX - centerX, 2) + pow(boxCenterY - centerY, 2)
+            
+            // Log for debugging
+            print("[VisionService] Instance \(id): Center (\(Int(boxCenterX)), \(Int(boxCenterY))), Distance: \(Int(sqrt(distSq)))")
+            
+            if distSq < minDistance {
+                minDistance = distSq
+                bestId = id
+            }
+        }
+        
+        if let best = bestId {
+            print("[VisionService] ✓ Selected Instance \(best) as main subject")
+            return IndexSet(integer: best)
+        }
+        
+        return allInstances
     }
 }

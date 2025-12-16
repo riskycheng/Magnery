@@ -171,10 +171,20 @@ struct CameraView: View {
                 showingSegmentation = true
             }
         }
+        .onChange(of: showingSegmentation) { oldValue, newValue in
+            if !newValue {
+                cameraManager.capturedImage = nil
+                cameraManager.startSession()
+            }
+        }
         .fullScreenCover(isPresented: $showingSegmentation) {
             if let image = cameraManager.capturedImage {
                 SegmentationView(originalImage: image)
             }
+        }
+        .onAppear {
+            cameraManager.capturedImage = nil
+            cameraManager.startSession()
         }
         .onDisappear {
             cameraManager.stopSession()

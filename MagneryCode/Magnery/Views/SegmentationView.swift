@@ -45,8 +45,15 @@ struct SegmentationView: View {
     @State private var outlineImage: UIImage?
     @State private var isProcessing = true
     @State private var showingAddView = false
+    @State private var showingCropView = false
     @State private var backgroundBlur: CGFloat = 0
     @State private var showBorder = false
+    @State private var currentImage: UIImage
+    
+    init(originalImage: UIImage) {
+        self.originalImage = originalImage
+        _currentImage = State(initialValue: originalImage)
+    }
     
     var body: some View {
         ZStack {
@@ -64,7 +71,7 @@ struct SegmentationView: View {
                 
                 ZStack {
                     if !isProcessing {
-                        Image(uiImage: originalImage)
+                        Image(uiImage: currentImage)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .blur(radius: backgroundBlur)
@@ -103,18 +110,17 @@ struct SegmentationView: View {
                 
                 HStack(spacing: 60) {
                     Button(action: {
-                        processImage()
+                        dismiss()
                     }) {
                         Circle()
                             .fill(Color.gray.opacity(0.8))
                             .frame(width: 60, height: 60)
                             .overlay(
-                                Image(systemName: "arrow.clockwise")
+                                Image(systemName: "arrow.counterclockwise")
                                     .font(.title2)
                                     .foregroundColor(.white)
                             )
                     }
-                    .disabled(isProcessing)
                     
                     Button(action: {
                         if segmentedImage != nil {
@@ -133,7 +139,7 @@ struct SegmentationView: View {
                     .disabled(isProcessing || segmentedImage == nil)
                     
                     Button(action: {
-                        dismiss()
+                        showingCropView = true
                     }) {
                         Circle()
                             .fill(Color.gray.opacity(0.8))
@@ -144,17 +150,26 @@ struct SegmentationView: View {
                                     .foregroundColor(.white)
                             )
                     }
+                    .disabled(isProcessing)
                 }
                 .padding(.bottom, 40)
             }
         }
         .onAppear {
-            processImage()
+            if segmentedImage == nil {
+                processImage()
+            }
         }
         .fullScreenCover(isPresented: $showingAddView) {
             if let image = segmentedImage {
                 let squareImage = ImageOutlineHelper.padToSquare(image: image) ?? image
                 AddMagnetView(image: squareImage)
+            }
+        }
+        .fullScreenCover(isPresented: $showingCropView) {
+            CropView(originalImage: currentImage) { croppedImage in
+                currentImage = croppedImage
+                processImage()
             }
         }
     }
@@ -169,8 +184,10 @@ struct SegmentationView: View {
         isProcessing = true
         backgroundBlur = 0
         showBorder = false
+        segmentedImage = nil
+        outlineImage = nil
         
-        VisionService.shared.removeBackground(from: originalImage) { result in
+        VisionService.shared.removeBackground(from: currentImage) { result in
             DispatchQueue.main.async {
                 if let result = result {
                     // Calculate dynamic offset and linewidth

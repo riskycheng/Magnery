@@ -34,6 +34,7 @@ class CameraManager: NSObject, ObservableObject {
     
     private let photoOutput = AVCapturePhotoOutput()
     private var photoDelegate: PhotoCaptureDelegate?
+    private let sessionQueue = DispatchQueue(label: "com.magnery.camera.sessionQueue")
     
     override init() {
         super.init()
@@ -60,27 +61,30 @@ class CameraManager: NSObject, ObservableObject {
     }
     
     func setupCamera() {
-        session.beginConfiguration()
-        
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let input = try? AVCaptureDeviceInput(device: device) else {
-            session.commitConfiguration()
-            return
-        }
-        
-        if session.canAddInput(input) {
-            session.addInput(input)
-        }
-        
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
-            photoOutput.maxPhotoQualityPrioritization = .quality
-        }
-        
-        session.commitConfiguration()
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            self.session.startRunning()
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.session.beginConfiguration()
+            
+            guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+                  let input = try? AVCaptureDeviceInput(device: device) else {
+                self.session.commitConfiguration()
+                return
+            }
+            
+            if self.session.canAddInput(input) {
+                self.session.addInput(input)
+            }
+            
+            if self.session.canAddOutput(self.photoOutput) {
+                self.session.addOutput(self.photoOutput)
+                self.photoOutput.maxPhotoQualityPrioritization = .quality
+            }
+            
+            self.session.commitConfiguration()
+            
+            if self.isAuthorized {
+                self.session.startRunning()
+            }
         }
     }
     
@@ -95,9 +99,20 @@ class CameraManager: NSObject, ObservableObject {
     }
     
     func stopSession() {
-        if session.isRunning {
-            DispatchQueue.global(qos: .userInitiated).async {
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            if self.session.isRunning {
                 self.session.stopRunning()
+            }
+        }
+    }
+    
+    func startSession() {
+        guard isAuthorized else { return }
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            if !self.session.isRunning {
+                self.session.startRunning()
             }
         }
     }
