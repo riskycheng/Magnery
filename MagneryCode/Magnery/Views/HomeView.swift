@@ -60,7 +60,7 @@ struct HomeView: View {
         ZStack {
             ColorfulRing()
                 .frame(width: 180, height: 180)
-                .rotationEffect(.degrees(ringRotation))
+                .rotationEffect(.degrees(ringRotation), anchor: .center)
                 .onAppear {
                     withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
                         ringRotation = 360
@@ -70,9 +70,9 @@ struct HomeView: View {
             ForEach(0..<8) { index in
                 Circle()
                     .fill(Color.gray.opacity(0.3))
-                    .frame(width: 8, height: 8)
+                    .frame(width: 6, height: 6)
                     .scaleEffect(dotScales[index])
-                    .offset(y: -110)
+                    .offset(y: -125)
                     .rotationEffect(.degrees(Double(index) * 45))
                     .onAppear {
                         withAnimation(
@@ -105,9 +105,6 @@ struct HomeView: View {
             }
         }
         .padding(.vertical, 20)
-        .transaction { transaction in
-            transaction.animation = nil
-        }
     }
     
     
@@ -165,9 +162,9 @@ struct ColorfulRing: View {
                     .trim(from: CGFloat(index) / CGFloat(colors.count),
                           to: CGFloat(index + 1) / CGFloat(colors.count) + 0.01)
                     .stroke(colors[index], style: StrokeStyle(lineWidth: 16, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
             }
         }
+        .rotationEffect(.degrees(-90))
     }
 }
 
