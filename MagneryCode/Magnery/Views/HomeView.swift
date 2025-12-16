@@ -34,7 +34,7 @@ struct HomeView: View {
                                     }
                                     
                                     ForEach(sectionData.groups) { group in
-                                        NavigationLink(destination: ListView(group: group)) {
+                                        NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
                                             GroupCard(group: group, groupingMode: store.groupingMode)
                                         }
                                         .buttonStyle(PlainButtonStyle())

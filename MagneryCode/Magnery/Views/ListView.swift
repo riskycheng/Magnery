@@ -2,10 +2,17 @@ import SwiftUI
 
 struct ListView: View {
     @EnvironmentObject var store: MagnetStore
-    let group: MagnetGroup
+    let group: MagnetGroup?
+    let scrollToGroup: Bool
     @State private var selectedItemId: UUID? = nil
-    @State private var items: [MagnetItem] = []
+    @State private var groups: [MagnetGroup] = []
     @State private var itemToShare: MagnetItem? = nil
+    @Namespace private var scrollNamespace
+    
+    init(group: MagnetGroup? = nil, scrollToGroup: Bool = false) {
+        self.group = group
+        self.scrollToGroup = scrollToGroup
+    }
     
     var body: some View {
         ZStack {
@@ -20,10 +27,10 @@ struct ListView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            items = sortedItems
+            groups = store.groupedMagnets()
         }
-        .onChange(of: group.items) { _ in
-            items = sortedItems
+        .onChange(of: store.magnets) { _ in
+            groups = store.groupedMagnets()
         }
         .sheet(item: $itemToShare) { item in
             if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
@@ -34,25 +41,41 @@ struct ListView: View {
     }
     
     private var contentScrollView: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                headerView
-                magnetGrid
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 30) {
+                    ForEach(groups) { currentGroup in
+                        VStack(spacing: 20) {
+                            headerView(for: currentGroup)
+                            magnetGrid(for: currentGroup)
+                        }
+                        .id(currentGroup.id)
+                    }
+                }
+                .padding(.top)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    deselectItem()
+                }
             }
-            .padding(.top)
-            .contentShape(Rectangle()) // Ensure the content area captures taps
-            .onTapGesture {
-                deselectItem()
+            .onAppear {
+                if scrollToGroup, let targetGroup = group {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation {
+                            proxy.scrollTo(targetGroup.id, anchor: .top)
+                        }
+                    }
+                }
             }
         }
     }
     
-    private var magnetGrid: some View {
+    private func magnetGrid(for group: MagnetGroup) -> some View {
         LazyVGrid(columns: [
             GridItem(.flexible(), spacing: 16),
             GridItem(.flexible(), spacing: 16)
         ], spacing: 16) {
-            ForEach(items) { item in
+            ForEach(group.items.sorted { $0.date > $1.date }) { item in
                 magnetItemView(for: item)
             }
         }
@@ -139,7 +162,6 @@ struct ListView: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             store.deleteMagnet(item)
             selectedItemId = nil
-            items.removeAll { $0.id == item.id }
         }
     }
     
@@ -151,7 +173,7 @@ struct ListView: View {
         }
     }
     
-    private var headerView: some View {
+    private func headerView(for group: MagnetGroup) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: store.groupingMode == .location ? "mappin.circle.fill" : "calendar")
@@ -169,9 +191,6 @@ struct ListView: View {
         .padding(.horizontal)
     }
     
-    private var sortedItems: [MagnetItem] {
-        group.items.sorted { $0.date > $1.date }
-    }
 }
 
 struct MagnetCard: View {
@@ -218,7 +237,7 @@ struct MagnetCard: View {
                     )
             }
             
-            Text(dateString)
+            Text(magnet.name)
                 .font(.system(size: 14, weight: .black, design: .rounded))
                 .foregroundColor(.primary)
                 .padding(.horizontal, 14)
@@ -226,17 +245,12 @@ struct MagnetCard: View {
                 .background(Color.white)
                 .clipShape(Capsule())
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                .lineLimit(1)
         }
         .opacity(isDimmed ? 0.3 : 1.0)
         .scaleEffect(isSelected ? 1.05 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
         .animation(.easeInOut(duration: 0.2), value: isDimmed)
-    }
-    
-    private var dateString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日"
-        return formatter.string(from: magnet.date)
     }
 }
 
@@ -268,12 +282,7 @@ struct DottedBackgroundView: View {
 
 #Preview {
     NavigationStack {
-        ListView(group: MagnetGroup(
-            title: "未知位置",
-            subtitle: "4个冰箱贴",
-            items: [],
-            color: .yellow.opacity(0.3)
-        ))
-        .environmentObject(MagnetStore())
+        ListView()
+            .environmentObject(MagnetStore())
     }
 }

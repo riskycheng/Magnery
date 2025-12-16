@@ -1,8 +1,18 @@
 import SwiftUI
 
 struct DetailView: View {
+    @EnvironmentObject var store: MagnetStore
     let magnet: MagnetItem
     @State private var showingAIDialog = false
+    @State private var showingEditMenu = false
+    @State private var showingEditSheet = false
+    @State private var currentMagnet: MagnetItem
+    @State private var groupItems: [MagnetItem] = []
+    
+    init(magnet: MagnetItem) {
+        self.magnet = magnet
+        _currentMagnet = State(initialValue: magnet)
+    }
     
     var body: some View {
         ZStack {

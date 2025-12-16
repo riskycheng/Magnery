@@ -20,7 +20,7 @@ struct MagnetItem: Identifiable, Codable, Equatable {
 }
 
 struct MagnetGroup: Identifiable {
-    let id = UUID()
+    var id: String { title }
     let title: String
     let subtitle: String
     let items: [MagnetItem]

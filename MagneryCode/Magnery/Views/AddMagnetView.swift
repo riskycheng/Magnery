@@ -32,9 +32,11 @@ struct AddMagnetView: View {
                     
                     VStack(spacing: 16) {
                         HStack {
-                            Text(name.isEmpty ? "Action Figure" : name)
+                            TextField("取个名字", text: $name)
                                 .font(.title3)
                                 .fontWeight(.semibold)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: 200)
                             
                             Button(action: {}) {
                                 Image(systemName: "speaker.wave.2.fill")
@@ -46,19 +48,19 @@ struct AddMagnetView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        HStack(spacing: 20) {
+                        HStack(spacing: 30) {
                             Button(action: {
                                 processImage()
                             }) {
                                 Circle()
                                     .fill(Color.white)
-                                    .frame(width: 60, height: 60)
+                                    .frame(width: 70, height: 70)
                                     .overlay(
                                         Image(systemName: "arrow.clockwise")
-                                            .font(.title2)
-                                            .foregroundColor(.black)
+                                            .font(.system(size: 24))
+                                            .foregroundColor(Color.orange)
                                     )
-                                    .shadow(radius: 2)
+                                    .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
                             }
                             
                             Button(action: {
@@ -66,13 +68,13 @@ struct AddMagnetView: View {
                             }) {
                                 Circle()
                                     .fill(Color.white)
-                                    .frame(width: 60, height: 60)
+                                    .frame(width: 80, height: 80)
                                     .overlay(
                                         Image(systemName: "checkmark")
-                                            .font(.title2)
-                                            .foregroundColor(.black)
+                                            .font(.system(size: 28, weight: .semibold))
+                                            .foregroundColor(Color.green)
                                     )
-                                    .shadow(radius: 2)
+                                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                             }
                             
                             Button(action: {
@@ -80,29 +82,16 @@ struct AddMagnetView: View {
                             }) {
                                 Circle()
                                     .fill(Color.white)
-                                    .frame(width: 60, height: 60)
+                                    .frame(width: 70, height: 70)
                                     .overlay(
                                         Image(systemName: "xmark")
-                                            .font(.title2)
-                                            .foregroundColor(.black)
+                                            .font(.system(size: 24))
+                                            .foregroundColor(Color.gray)
                                     )
-                                    .shadow(radius: 2)
+                                    .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
                             }
                         }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Image(systemName: "pencil")
-                                    .foregroundColor(.orange)
-                                Text("和你知道的物品名称不一样？点击调整")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            TextField("输入物品名称", text: $name)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                        }
-                        .padding(.horizontal)
+                        .padding(.vertical, 8)
                     }
                     
                     Spacer()
