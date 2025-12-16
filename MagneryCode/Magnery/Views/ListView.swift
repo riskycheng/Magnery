@@ -5,11 +5,16 @@ struct ListView: View {
     let group: MagnetGroup
     @State private var selectedItemId: UUID? = nil
     @State private var items: [MagnetItem] = []
+    @State private var itemToShare: MagnetItem? = nil
     
     var body: some View {
         ZStack {
             DottedBackgroundView()
                 .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    deselectItem()
+                }
             
             contentScrollView
         }
@@ -20,6 +25,12 @@ struct ListView: View {
         .onChange(of: group.items) { _ in
             items = sortedItems
         }
+        .sheet(item: $itemToShare) { item in
+            if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
+                ShareSheet(activityItems: [image])
+                    .presentationDetents([.medium, .large])
+            }
+        }
     }
     
     private var contentScrollView: some View {
@@ -29,6 +40,10 @@ struct ListView: View {
                 magnetGrid
             }
             .padding(.top)
+            .contentShape(Rectangle()) // Ensure the content area captures taps
+            .onTapGesture {
+                deselectItem()
+            }
         }
     }
     
@@ -71,26 +86,24 @@ struct ListView: View {
     
     private func actionButtons(for item: MagnetItem) -> some View {
         VStack(spacing: 12) {
-            closeButton
+            shareButton(for: item)
             deleteButton(for: item)
         }
         .offset(x: -8, y: -8)
         .transition(.scale.combined(with: .opacity))
     }
     
-    private var closeButton: some View {
+    private func shareButton(for item: MagnetItem) -> some View {
         Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                selectedItemId = nil
-            }
+            itemToShare = item
         }) {
             Circle()
                 .fill(Color.white)
                 .frame(width: 44, height: 44)
                 .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
                 .overlay(
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 22))
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 20))
                         .foregroundColor(.gray)
                 )
         }
@@ -127,6 +140,14 @@ struct ListView: View {
             store.deleteMagnet(item)
             selectedItemId = nil
             items.removeAll { $0.id == item.id }
+        }
+    }
+    
+    private func deselectItem() {
+        if selectedItemId != nil {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                selectedItemId = nil
+            }
         }
     }
     
