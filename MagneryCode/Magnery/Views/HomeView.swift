@@ -22,15 +22,28 @@ struct HomeView: View {
                     groupingToggle
                     
                     ScrollView {
-                        VStack(spacing: 16) {
-                            ForEach(store.groupedMagnets()) { group in
-                                NavigationLink(destination: ListView(group: group)) {
-                                    GroupCard(group: group, groupingMode: store.groupingMode)
+                        VStack(alignment: .leading, spacing: 20) {
+                            ForEach(groupedBySection(), id: \.section) { sectionData in
+                                VStack(alignment: .leading, spacing: 12) {
+                                    if !sectionData.section.isEmpty {
+                                        Text(sectionData.section)
+                                            .font(.title3)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.primary)
+                                            .padding(.horizontal)
+                                    }
+                                    
+                                    ForEach(sectionData.groups) { group in
+                                        NavigationLink(destination: ListView(group: group)) {
+                                            GroupCard(group: group, groupingMode: store.groupingMode)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .padding(.horizontal)
+                                    }
                                 }
-                                .buttonStyle(PlainButtonStyle())
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.top, 8)
                     }
                     .animation(nil, value: ringRotation)
                     .animation(nil, value: cameraScale)
@@ -72,7 +85,7 @@ struct HomeView: View {
                     .fill(Color.gray.opacity(0.3))
                     .frame(width: 6, height: 6)
                     .scaleEffect(dotScales[index])
-                    .offset(y: -125)
+                    .offset(y: -115)
                     .rotationEffect(.degrees(Double(index) * 45))
                     .onAppear {
                         withAnimation(
@@ -104,7 +117,7 @@ struct HomeView: View {
                 }
             }
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 40)
     }
     
     
@@ -144,6 +157,69 @@ struct HomeView: View {
     private var uniqueLocationsCount: Int {
         Set(store.magnets.map { $0.location }).count
     }
+    
+    private func groupedBySection() -> [SectionData] {
+        let groups = store.groupedMagnets()
+        
+        if store.groupingMode == .time {
+            let calendar = Calendar.current
+            let groupedByMonth = Dictionary(grouping: groups) { group -> String in
+                if let firstItem = group.items.first {
+                    let components = calendar.dateComponents([.year, .month], from: firstItem.date)
+                    let monthFormatter = DateFormatter()
+                    monthFormatter.dateFormat = "M月份"
+                    if let date = calendar.date(from: components) {
+                        return monthFormatter.string(from: date)
+                    }
+                }
+                return ""
+            }
+            
+            return groupedByMonth.map { (section, groups) in
+                SectionData(section: section, groups: groups.sorted { $0.items.first!.date > $1.items.first!.date })
+            }.sorted { section1, section2 in
+                guard let date1 = section1.groups.first?.items.first?.date,
+                      let date2 = section2.groups.first?.items.first?.date else {
+                    return false
+                }
+                return date1 > date2
+            }
+        } else {
+            let groupedByCity = Dictionary(grouping: groups) { group -> String in
+                return extractCityName(from: group.title)
+            }
+            
+            return groupedByCity.map { (section, groups) in
+                SectionData(section: section, groups: groups.sorted { $0.items.count > $1.items.count })
+            }.sorted { $0.groups.reduce(0) { $0 + $1.items.count } > $1.groups.reduce(0) { $0 + $1.items.count } }
+        }
+    }
+    
+    private func extractCityName(from location: String) -> String {
+        if location == "未知位置" {
+            return "未知位置"
+        }
+        
+        if location.contains("市") {
+            if let range = location.range(of: "市") {
+                let cityName = String(location[..<range.upperBound])
+                return cityName
+            }
+        }
+        
+        if location.contains("省") {
+            if let range = location.range(of: "省") {
+                return String(location[..<range.upperBound])
+            }
+        }
+        
+        return location
+    }
+}
+
+struct SectionData {
+    let section: String
+    let groups: [MagnetGroup]
 }
 
 struct ColorfulRing: View {
