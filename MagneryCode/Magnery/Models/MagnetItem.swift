@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-struct MagnetItem: Identifiable, Codable {
+struct MagnetItem: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
     var date: Date
