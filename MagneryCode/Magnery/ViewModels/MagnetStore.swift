@@ -62,9 +62,9 @@ class MagnetStore: ObservableObject {
     
     private func groupByTime() -> [MagnetGroup] {
         let calendar = Calendar.current
-        let grouped = Dictionary(grouping: magnets) { magnet -> String in
-            let components = calendar.dateComponents([.year, .month], from: magnet.date)
-            return "\(components.year!)年\(components.month!)月"
+        let grouped = Dictionary(grouping: magnets) { magnet -> Date in
+            let components = calendar.dateComponents([.year, .month, .day], from: magnet.date)
+            return calendar.date(from: components)!
         }
         
         let colors: [Color] = [
@@ -76,15 +76,14 @@ class MagnetStore: ObservableObject {
         ]
         
         return grouped.enumerated().map { index, pair in
-            let (period, items) = pair
-            let sortedItems = items.sorted { $0.date > $1.date }
+            let (date, items) = pair
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "M月d日"
             
             return MagnetGroup(
-                title: dateFormatter.string(from: sortedItems.first!.date),
+                title: dateFormatter.string(from: date),
                 subtitle: "\(items.count)个冰箱贴",
-                items: sortedItems,
+                items: items.sorted { $0.date > $1.date },
                 color: colors[index % colors.count]
             )
         }.sorted { $0.items.first!.date > $1.items.first!.date }

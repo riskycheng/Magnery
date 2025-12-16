@@ -3,7 +3,6 @@ import SwiftUI
 struct ListView: View {
     @EnvironmentObject var store: MagnetStore
     let group: MagnetGroup
-    @State private var sortByTime = false
     
     var body: some View {
         ZStack {
@@ -31,31 +30,12 @@ struct ListView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    sortByTime.toggle()
-                    store.groupingMode = sortByTime ? .time : .location
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: sortByTime ? "calendar" : "mappin.circle")
-                        Text(sortByTime ? "按日期" : "按地点")
-                            .font(.subheadline)
-                    }
-                    .foregroundColor(.primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.white)
-                    .clipShape(Capsule())
-                }
-            }
-        }
     }
     
     private var headerView: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: sortByTime ? "calendar" : "mappin.circle.fill")
+                Image(systemName: store.groupingMode == .location ? "mappin.circle.fill" : "calendar")
                     .foregroundColor(.primary)
                 Text(group.title)
                     .font(.title)
