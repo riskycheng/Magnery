@@ -167,8 +167,8 @@ struct DetailView: View {
     
     private var circularMenuButtons: some View {
         let buttonSize: CGFloat = 56
-        let horizontalSpacing: CGFloat = 80
-        let verticalSpacing: CGFloat = 80
+        let horizontalSpacing: CGFloat = 60
+        let verticalSpacing: CGFloat = -20
         
         return ZStack {
             // edit_circle_btn: same Y as menu_button, X offset to the left
@@ -187,7 +187,7 @@ struct DetailView: View {
                         .foregroundColor(.black)
                 }
             }
-            .offset(x: -horizontalSpacing, y: 0)
+            .offset(x: -horizontalSpacing, y: -60)
             .scaleEffect(showingEditMenu ? 1 : 0.1)
             .opacity(showingEditMenu ? 1 : 0)
             
