@@ -129,18 +129,21 @@ struct EditMagnetSheet: View {
                 
                 VStack(spacing: 16) {
                     Button(action: {
-                        magnet.name = editedName
-                        magnet.notes = editedNotes
-                        onSave()
+                        if !editedName.trimmingCharacters(in: .whitespaces).isEmpty {
+                            magnet.name = editedName
+                            magnet.notes = editedNotes
+                            onSave()
+                        }
                     }) {
                         Text("保存")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.black)
+                            .background(editedName.trimmingCharacters(in: .whitespaces).isEmpty ? Color.gray : Color.black)
                             .clipShape(Capsule())
                     }
+                    .disabled(editedName.trimmingCharacters(in: .whitespaces).isEmpty)
                     .padding(.horizontal, 40)
                     
                     Button(action: {

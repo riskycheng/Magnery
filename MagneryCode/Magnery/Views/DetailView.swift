@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DetailView: View {
+    @Environment(\.dismiss) var dismiss
     @EnvironmentObject var store: MagnetStore
     let magnet: MagnetItem
     @State private var showingAIDialog = false
@@ -25,58 +26,51 @@ struct DetailView: View {
                         .padding(.top, 8)
                 }
                 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        Spacer()
-                            .frame(height: 20)
-                        
-                        if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxHeight: 350)
-                                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-                                .padding(.horizontal, 40)
-                        }
-                        
-                        VStack(spacing: 8) {
-                            Text(currentMagnet.name)
-                                .font(.system(size: 32, weight: .bold, design: .default))
-                                .foregroundColor(.primary)
-                            
-                            if !currentMagnet.notes.isEmpty {
-                                Text(currentMagnet.notes)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 40)
-                            }
-                        }
-                        
-                        Spacer()
-                            .frame(height: 40)
-                        
-                        Button(action: {
-                            showingAIDialog = true
-                        }) {
-                            HStack {
-                                Image(systemName: "lightbulb.fill")
-                                Text("AI科普")
-                                    .fontWeight(.semibold)
-                            }
-                            .foregroundColor(Color.orange)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.white)
-                            .clipShape(Capsule())
-                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                Spacer()
+                
+                if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxHeight: 350)
+                        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+                        .padding(.horizontal, 40)
+                }
+                
+                VStack(spacing: 8) {
+                    Text(currentMagnet.name)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .foregroundColor(.primary)
+                    
+                    if !currentMagnet.notes.isEmpty {
+                        Text(currentMagnet.notes)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
                             .padding(.horizontal, 40)
-                        }
-                        
-                        Spacer()
-                            .frame(height: 40)
                     }
                 }
+                .padding(.top, 24)
+                
+                Spacer()
+                
+                Button(action: {
+                    showingAIDialog = true
+                }) {
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                        Text("AI科普")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(Color.orange)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.white)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    .padding(.horizontal, 40)
+                }
+                .padding(.bottom, 40)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -93,7 +87,7 @@ struct DetailView: View {
         }
         .overlay(alignment: .topTrailing) {
             if showingEditMenu {
-                editMenuOverlay
+                circularMenuButtons
             }
         }
         .onAppear {
@@ -141,59 +135,48 @@ struct DetailView: View {
         }
     }
     
-    private var editMenuOverlay: some View {
-        VStack(alignment: .leading, spacing: 0) {
+    private var circularMenuButtons: some View {
+        ZStack {
             Button(action: {
                 showingEditMenu = false
                 showingEditSheet = true
             }) {
-                HStack {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 56, height: 56)
+                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    
                     Image(systemName: "pencil")
-                    Text("编辑单词")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.black)
                 }
-                .foregroundColor(.primary)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            
-            Divider()
-            
-            Button(action: {
-                showingEditMenu = false
-                saveAsWallpaper()
-            }) {
-                HStack {
-                    Image(systemName: "arrow.down.circle")
-                    Text("下载壁纸")
-                }
-                .foregroundColor(.primary)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            
-            Divider()
+            .offset(x: -65, y: 5)
+            .scaleEffect(showingEditMenu ? 1 : 0.1)
+            .opacity(showingEditMenu ? 1 : 0)
             
             Button(action: {
                 showingEditMenu = false
                 deleteMagnet()
             }) {
-                HStack {
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 56, height: 56)
+                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    
                     Image(systemName: "trash.fill")
-                    Text("删除")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.red)
                 }
-                .foregroundColor(.red)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .offset(x: 5, y: 65)
+            .scaleEffect(showingEditMenu ? 1 : 0.1)
+            .opacity(showingEditMenu ? 1 : 0)
         }
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-        .frame(width: 180)
-        .padding(.top, 60)
-        .padding(.trailing, 8)
-        .transition(.scale.combined(with: .opacity))
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingEditMenu)
+        .padding(.trailing, 16)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: showingEditMenu)
     }
     
     private var groupTitle: String {
@@ -222,6 +205,7 @@ struct DetailView: View {
     
     private func deleteMagnet() {
         store.deleteMagnet(currentMagnet)
+        dismiss()
     }
 }
 
