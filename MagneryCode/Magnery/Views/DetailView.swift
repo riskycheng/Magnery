@@ -46,6 +46,10 @@ struct DetailView: View {
                             .frame(maxHeight: 350)
                             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
                             .padding(.horizontal, 40)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 0.8).combined(with: .opacity)
+                            ))
                             .gesture(
                                 DragGesture(minimumDistance: 30)
                                     .onEnded { value in
@@ -168,14 +172,21 @@ struct DetailView: View {
                                     .aspectRatio(contentMode: .fit)
                                     .frame(width: 60, height: 60)
                                     .opacity(item.id == currentMagnet.id ? 1.0 : 0.5)
-                                    .scaleEffect(item.id == currentMagnet.id ? 1.1 : 1.0)
+                                    .scaleEffect(item.id == currentMagnet.id ? 1.3 : 0.9)
+                                    .shadow(
+                                        color: item.id == currentMagnet.id ? .blue.opacity(0.3) : .clear,
+                                        radius: item.id == currentMagnet.id ? 8 : 0,
+                                        x: 0,
+                                        y: 2
+                                    )
                             }
                         }
                     }
                 }
                 .padding(.horizontal)
+                .padding(.vertical, 10)
             }
-            .frame(height: 80)
+            .frame(height: 100)
         }
     }
     
