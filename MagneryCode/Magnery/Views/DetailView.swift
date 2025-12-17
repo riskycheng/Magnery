@@ -16,73 +16,212 @@ struct DetailView: View {
     
     var body: some View {
         ZStack {
-            Color(UIColor.systemGroupedBackground)
+            Color(red: 0.95, green: 0.95, blue: 0.97)
                 .ignoresSafeArea()
             
-            VStack(spacing: 20) {
-                Spacer()
+            VStack(spacing: 0) {
+                if !groupItems.isEmpty {
+                    horizontalItemsList
+                        .padding(.top, 8)
+                }
                 
-                VStack(spacing: 20) {
-                    if let image = ImageManager.shared.loadImage(filename: magnet.imagePath) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 300)
-                            .background(Color.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                            .shadow(radius: 10)
-                            .padding(.horizontal, 40)
-                    }
-                    
-                    VStack(spacing: 12) {
-                        Text(magnet.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
+                ScrollView {
+                    VStack(spacing: 24) {
+                        Spacer()
+                            .frame(height: 20)
                         
-                        Text(dateString)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        if !magnet.notes.isEmpty {
-                            Text("\"\(magnet.notes)\"")
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
+                        if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxHeight: 350)
+                                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+                                .padding(.horizontal, 40)
                         }
+                        
+                        VStack(spacing: 12) {
+                            Text(currentMagnet.name)
+                                .font(.system(size: 32, weight: .bold, design: .default))
+                                .foregroundColor(.primary)
+                            
+                            if !currentMagnet.notes.isEmpty {
+                                Text(currentMagnet.notes)
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 40)
+                            }
+                        }
+                        
+                        Spacer()
+                            .frame(height: 40)
+                        
+                        Button(action: {
+                            showingAIDialog = true
+                        }) {
+                            HStack {
+                                Image(systemName: "lightbulb.fill")
+                                Text("查看例句")
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(Color.orange)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.white)
+                            .clipShape(Capsule())
+                            .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                            .padding(.horizontal, 40)
+                        }
+                        
+                        Spacer()
+                            .frame(height: 40)
                     }
                 }
-                
-                Spacer()
-                
-                Button(action: {
-                    showingAIDialog = true
-                }) {
-                    HStack {
-                        Image(systemName: "lightbulb.fill")
-                        Text("AI 科普")
-                            .fontWeight(.semibold)
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.orange)
-                    .clipShape(Capsule())
-                    .padding(.horizontal, 40)
-                }
-                .padding(.bottom, 40)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingEditMenu.toggle()
+                }) {
+                    Image(systemName: "ellipsis")
+                        .foregroundColor(.primary)
+                        .padding(8)
+                }
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if showingEditMenu {
+                editMenuOverlay
+            }
+        }
+        .onAppear {
+            loadGroupItems()
+        }
         .sheet(isPresented: $showingAIDialog) {
-            AIDialogView(magnet: magnet)
+            AIDialogView(magnet: currentMagnet)
+        }
+        .sheet(isPresented: $showingEditSheet) {
+            EditMagnetSheet(magnet: $currentMagnet, onSave: {
+                store.updateMagnet(currentMagnet)
+                showingEditSheet = false
+            })
         }
     }
     
-    private var dateString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy.MM.dd"
-        return formatter.string(from: magnet.date)
+    private var horizontalItemsList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(groupTitle)
+                .font(.headline)
+                .padding(.horizontal)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(groupItems) { item in
+                        Button(action: {
+                            withAnimation {
+                                currentMagnet = item
+                            }
+                        }) {
+                            if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 60, height: 60)
+                                    .opacity(item.id == currentMagnet.id ? 1.0 : 0.5)
+                                    .scaleEffect(item.id == currentMagnet.id ? 1.1 : 1.0)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .frame(height: 80)
+        }
+    }
+    
+    private var editMenuOverlay: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: {
+                showingEditMenu = false
+                showingEditSheet = true
+            }) {
+                HStack {
+                    Image(systemName: "pencil")
+                    Text("编辑单词")
+                }
+                .foregroundColor(.primary)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            
+            Divider()
+            
+            Button(action: {
+                showingEditMenu = false
+                saveAsWallpaper()
+            }) {
+                HStack {
+                    Image(systemName: "arrow.down.circle")
+                    Text("下载壁纸")
+                }
+                .foregroundColor(.primary)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            
+            Divider()
+            
+            Button(action: {
+                showingEditMenu = false
+                deleteMagnet()
+            }) {
+                HStack {
+                    Image(systemName: "trash.fill")
+                    Text("删除")
+                }
+                .foregroundColor(.red)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+        .frame(width: 180)
+        .padding(.top, 60)
+        .padding(.trailing, 8)
+        .transition(.scale.combined(with: .opacity))
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showingEditMenu)
+    }
+    
+    private var groupTitle: String {
+        if store.groupingMode == .location {
+            return currentMagnet.location
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "M月d日"
+            return formatter.string(from: currentMagnet.date)
+        }
+    }
+    
+    private func loadGroupItems() {
+        let groups = store.groupedMagnets()
+        if let group = groups.first(where: { group in
+            group.items.contains(where: { $0.id == magnet.id })
+        }) {
+            groupItems = group.items.sorted { $0.date > $1.date }
+        }
+    }
+    
+    private func saveAsWallpaper() {
+        guard let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) else { return }
+        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+    }
+    
+    private func deleteMagnet() {
+        store.deleteMagnet(currentMagnet)
     }
 }
 
