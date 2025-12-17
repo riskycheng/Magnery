@@ -1,5 +1,12 @@
 import SwiftUI
 
+struct EllipsisButtonBoundsKey: PreferenceKey {
+    static var defaultValue: CGRect?
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        value = value ?? nextValue()
+    }
+}
+
 struct DetailView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var store: MagnetStore
@@ -9,6 +16,7 @@ struct DetailView: View {
     @State private var showingEditSheet = false
     @State private var currentMagnet: MagnetItem
     @State private var groupItems: [MagnetItem] = []
+    @State private var ellipsisButtonFrame: CGRect = .zero
     
     init(magnet: MagnetItem) {
         self.magnet = magnet
@@ -17,77 +25,97 @@ struct DetailView: View {
     
     var body: some View {
         ZStack {
-            Color(red: 0.95, green: 0.95, blue: 0.97)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                if !groupItems.isEmpty {
-                    horizontalItemsList
-                        .padding(.top, 8)
-                }
+            ZStack {
+                Color(red: 0.95, green: 0.95, blue: 0.97)
+                    .ignoresSafeArea()
                 
-                Spacer()
-                
-                if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: 350)
-                        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-                        .padding(.horizontal, 40)
-                }
-                
-                VStack(spacing: 8) {
-                    Text(currentMagnet.name)
-                        .font(.system(size: 32, weight: .bold, design: .default))
-                        .foregroundColor(.primary)
+                VStack(spacing: 0) {
+                    if !groupItems.isEmpty {
+                        horizontalItemsList
+                            .padding(.top, 8)
+                    }
                     
-                    if !currentMagnet.notes.isEmpty {
-                        Text(currentMagnet.notes)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
+                    Spacer()
+                    
+                    if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: 350)
+                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
                             .padding(.horizontal, 40)
                     }
-                }
-                .padding(.top, 24)
-                
-                Spacer()
-                
-                Button(action: {
-                    showingAIDialog = true
-                }) {
-                    HStack {
-                        Image(systemName: "lightbulb.fill")
-                        Text("AI科普")
-                            .fontWeight(.semibold)
+                    
+                    VStack(spacing: 8) {
+                        Text(currentMagnet.name)
+                            .font(.system(size: 32, weight: .bold, design: .default))
+                            .foregroundColor(.primary)
+                        
+                        if !currentMagnet.notes.isEmpty {
+                            Text(currentMagnet.notes)
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
                     }
-                    .foregroundColor(Color.orange)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.white)
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                    .padding(.horizontal, 40)
+                    .padding(.top, 24)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        showingAIDialog = true
+                    }) {
+                        HStack {
+                            Image(systemName: "lightbulb.fill")
+                            Text("AI科普")
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(Color.orange)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.white)
+                        .clipShape(Capsule())
+                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                        .padding(.horizontal, 40)
+                    }
+                    .padding(.bottom, 40)
                 }
-                .padding(.bottom, 40)
             }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showingEditMenu.toggle()
-                }) {
-                    Image(systemName: "ellipsis")
-                        .foregroundColor(.primary)
-                        .padding(8)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        showingEditMenu.toggle()
+                    }) {
+                        Image(systemName: "ellipsis")
+                            .foregroundColor(.primary)
+                            .padding(8)
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear
+                                        .preference(
+                                            key: EllipsisButtonBoundsKey.self,
+                                            value: geo.frame(in: .global).midX > 0 ? geo.frame(in: .global) : nil
+                                        )
+                                }
+                            )
+                    }
                 }
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            if showingEditMenu {
+            .onPreferenceChange(EllipsisButtonBoundsKey.self) { frame in
+                if let frame = frame {
+                    ellipsisButtonFrame = frame
+                }
+            }
+            
+            if showingEditMenu && ellipsisButtonFrame != .zero {
                 circularMenuButtons
+                    .position(
+                        x: ellipsisButtonFrame.midX,
+                        y: ellipsisButtonFrame.midY - 20
+                    )
+                    .zIndex(999)
             }
         }
         .onAppear {
@@ -136,7 +164,12 @@ struct DetailView: View {
     }
     
     private var circularMenuButtons: some View {
-        ZStack {
+        let buttonSize: CGFloat = 56
+        let horizontalSpacing: CGFloat = 80
+        let verticalSpacing: CGFloat = 80
+        
+        return ZStack {
+            // edit_circle_btn: same Y as menu_button, X offset to the left
             Button(action: {
                 showingEditMenu = false
                 showingEditSheet = true
@@ -144,7 +177,7 @@ struct DetailView: View {
                 ZStack {
                     Circle()
                         .fill(Color.white)
-                        .frame(width: 56, height: 56)
+                        .frame(width: buttonSize, height: buttonSize)
                         .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
                     
                     Image(systemName: "pencil")
@@ -152,10 +185,11 @@ struct DetailView: View {
                         .foregroundColor(.black)
                 }
             }
-            .offset(x: -65, y: 5)
+            .offset(x: -horizontalSpacing, y: 0)
             .scaleEffect(showingEditMenu ? 1 : 0.1)
             .opacity(showingEditMenu ? 1 : 0)
             
+            // delete_circle_btn: same X as menu_button, Y offset downward
             Button(action: {
                 showingEditMenu = false
                 deleteMagnet()
@@ -163,7 +197,7 @@ struct DetailView: View {
                 ZStack {
                     Circle()
                         .fill(Color.white)
-                        .frame(width: 56, height: 56)
+                        .frame(width: buttonSize, height: buttonSize)
                         .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
                     
                     Image(systemName: "trash.fill")
@@ -171,11 +205,10 @@ struct DetailView: View {
                         .foregroundColor(.red)
                 }
             }
-            .offset(x: 5, y: 65)
+            .offset(x: 0, y: verticalSpacing)
             .scaleEffect(showingEditMenu ? 1 : 0.1)
             .opacity(showingEditMenu ? 1 : 0)
         }
-        .padding(.trailing, 16)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: showingEditMenu)
     }
     
@@ -204,8 +237,28 @@ struct DetailView: View {
     }
     
     private func deleteMagnet() {
+        let currentIndex = groupItems.firstIndex(where: { $0.id == currentMagnet.id })
         store.deleteMagnet(currentMagnet)
-        dismiss()
+        
+        DispatchQueue.main.async {
+            loadGroupItems()
+            
+            if !groupItems.isEmpty {
+                if let index = currentIndex {
+                    if index < groupItems.count {
+                        currentMagnet = groupItems[index]
+                    } else if index > 0 {
+                        currentMagnet = groupItems[index - 1]
+                    } else {
+                        currentMagnet = groupItems[0]
+                    }
+                } else {
+                    currentMagnet = groupItems[0]
+                }
+            } else {
+                dismiss()
+            }
+        }
     }
 }
 
