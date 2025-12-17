@@ -17,6 +17,7 @@ struct DetailView: View {
     @State private var currentMagnet: MagnetItem
     @State private var groupItems: [MagnetItem] = []
     @State private var ellipsisButtonFrame: CGRect = .zero
+    @State private var refreshTrigger: Bool = false
     
     init(magnet: MagnetItem) {
         self.magnet = magnet
@@ -81,6 +82,7 @@ struct DetailView: View {
                     }
                     .padding(.bottom, 40)
                 }
+                .id(currentMagnet.id)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -225,9 +227,11 @@ struct DetailView: View {
     private func loadGroupItems() {
         let groups = store.groupedMagnets()
         if let group = groups.first(where: { group in
-            group.items.contains(where: { $0.id == magnet.id })
+            group.items.contains(where: { $0.id == currentMagnet.id })
         }) {
             groupItems = group.items.sorted { $0.date > $1.date }
+        } else {
+            groupItems = []
         }
     }
     
@@ -238,24 +242,37 @@ struct DetailView: View {
     
     private func deleteMagnet() {
         let currentIndex = groupItems.firstIndex(where: { $0.id == currentMagnet.id })
+        
+        // 在删除前，从当前的groupItems中确定下一个要显示的item
+        var nextMagnet: MagnetItem?
+        if let index = currentIndex {
+            // 创建删除后的临时列表
+            var tempItems = groupItems
+            tempItems.remove(at: index)
+            
+            if !tempItems.isEmpty {
+                // 优先显示同索引位置的item，如果超出范围则显示前一个
+                if index < tempItems.count {
+                    nextMagnet = tempItems[index]
+                } else if index > 0 {
+                    nextMagnet = tempItems[index - 1]
+                } else {
+                    nextMagnet = tempItems[0]
+                }
+            }
+        }
+        
+        // 执行删除
         store.deleteMagnet(currentMagnet)
         
         DispatchQueue.main.async {
-            loadGroupItems()
-            
-            if !groupItems.isEmpty {
-                if let index = currentIndex {
-                    if index < groupItems.count {
-                        currentMagnet = groupItems[index]
-                    } else if index > 0 {
-                        currentMagnet = groupItems[index - 1]
-                    } else {
-                        currentMagnet = groupItems[0]
-                    }
-                } else {
-                    currentMagnet = groupItems[0]
-                }
+            if let next = nextMagnet {
+                // 有下一个item，切换过去
+                currentMagnet = next
+                loadGroupItems()
+                refreshTrigger.toggle()
             } else {
+                // 没有下一个item，返回上一级
                 dismiss()
             }
         }
