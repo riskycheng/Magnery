@@ -31,18 +31,11 @@ struct AddMagnetView: View {
                         .padding(.horizontal)
                     
                     VStack(spacing: 16) {
-                        HStack {
-                            TextField("取个名字", text: $name)
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: 200)
-                            
-                            Button(action: {}) {
-                                Image(systemName: "speaker.wave.2.fill")
-                                    .foregroundColor(.gray)
-                            }
-                        }
+                        TextField("取个名字", text: $name)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 200)
                         
                         Text(location)
                             .font(.subheadline)

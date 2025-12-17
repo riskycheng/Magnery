@@ -39,15 +39,15 @@ struct DetailView: View {
                                 .padding(.horizontal, 40)
                         }
                         
-                        VStack(spacing: 12) {
+                        VStack(spacing: 8) {
                             Text(currentMagnet.name)
                                 .font(.system(size: 32, weight: .bold, design: .default))
                                 .foregroundColor(.primary)
                             
                             if !currentMagnet.notes.isEmpty {
                                 Text(currentMagnet.notes)
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal, 40)
                             }
@@ -61,7 +61,7 @@ struct DetailView: View {
                         }) {
                             HStack {
                                 Image(systemName: "lightbulb.fill")
-                                Text("查看例句")
+                                Text("AI科普")
                                     .fontWeight(.semibold)
                             }
                             .foregroundColor(Color.orange)
