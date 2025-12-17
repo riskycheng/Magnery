@@ -18,6 +18,7 @@ struct DetailView: View {
     @State private var groupItems: [MagnetItem] = []
     @State private var ellipsisButtonFrame: CGRect = .zero
     @State private var refreshTrigger: Bool = false
+    @State private var showingDeleteConfirmation = false
     
     init(magnet: MagnetItem) {
         self.magnet = magnet
@@ -45,6 +46,12 @@ struct DetailView: View {
                             .frame(maxHeight: 350)
                             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
                             .padding(.horizontal, 40)
+                            .gesture(
+                                DragGesture(minimumDistance: 30)
+                                    .onEnded { value in
+                                        handleSwipeGesture(translation: value.translation)
+                                    }
+                            )
                     }
                     
                     VStack(spacing: 8) {
@@ -82,7 +89,6 @@ struct DetailView: View {
                     }
                     .padding(.bottom, 40)
                 }
-                .id(currentMagnet.id)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -132,6 +138,14 @@ struct DetailView: View {
                 showingEditSheet = false
             })
         }
+        .alert("确认删除", isPresented: $showingDeleteConfirmation) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                deleteMagnet()
+            }
+        } message: {
+            Text("确定要删除「\(currentMagnet.name)」吗？")
+        }
     }
     
     private var horizontalItemsList: some View {
@@ -167,11 +181,15 @@ struct DetailView: View {
     
     private var circularMenuButtons: some View {
         let buttonSize: CGFloat = 56
-        let horizontalSpacing: CGFloat = 60
-        let verticalSpacing: CGFloat = -20
+        // Calculate spacing relative to button size for consistency across devices
+        // Edit button: positioned to the left with slight upward offset
+        let editHorizontalOffset: CGFloat = buttonSize * 1.07  // ~60pt for 56pt button
+        let editVerticalOffset: CGFloat = -buttonSize * 1.07   // ~-60pt for 56pt button
+        // Delete button: positioned below with slight downward offset
+        let deleteVerticalOffset: CGFloat = -buttonSize * 0.36 // ~-20pt for 56pt button
         
         return ZStack {
-            // edit_circle_btn: same Y as menu_button, X offset to the left
+            // edit_circle_btn: positioned upper-left relative to menu_button
             Button(action: {
                 showingEditMenu = false
                 showingEditSheet = true
@@ -180,34 +198,38 @@ struct DetailView: View {
                     Circle()
                         .fill(Color.white)
                         .frame(width: buttonSize, height: buttonSize)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                        .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 5)
                     
-                    Image(systemName: "pencil")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(.black)
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.blue)
+                        .symbolRenderingMode(.hierarchical)
                 }
+                .contentShape(Circle())
             }
-            .offset(x: -horizontalSpacing, y: -60)
+            .offset(x: -editHorizontalOffset, y: editVerticalOffset)
             .scaleEffect(showingEditMenu ? 1 : 0.1)
             .opacity(showingEditMenu ? 1 : 0)
             
-            // delete_circle_btn: same X as menu_button, Y offset downward
+            // delete_circle_btn: positioned below menu_button
             Button(action: {
                 showingEditMenu = false
-                deleteMagnet()
+                showingDeleteConfirmation = true
             }) {
                 ZStack {
                     Circle()
                         .fill(Color.white)
                         .frame(width: buttonSize, height: buttonSize)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                        .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 5)
                     
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 22, weight: .semibold))
+                    Image(systemName: "trash.circle.fill")
+                        .font(.system(size: 28, weight: .bold))
                         .foregroundColor(.red)
+                        .symbolRenderingMode(.hierarchical)
                 }
+                .contentShape(Circle())
             }
-            .offset(x: 0, y: verticalSpacing)
+            .offset(x: 0, y: deleteVerticalOffset)
             .scaleEffect(showingEditMenu ? 1 : 0.1)
             .opacity(showingEditMenu ? 1 : 0)
         }
@@ -238,6 +260,32 @@ struct DetailView: View {
     private func saveAsWallpaper() {
         guard let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) else { return }
         UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+    }
+    
+    private func handleSwipeGesture(translation: CGSize) {
+        guard !groupItems.isEmpty else { return }
+        
+        let currentIndex = groupItems.firstIndex(where: { $0.id == currentMagnet.id }) ?? 0
+        
+        // 右滑 (translation.width > 0) -> 上一个item
+        // 左滑 (translation.width < 0) -> 下一个item
+        if translation.width > 0 {
+            // 右滑：切换到上一个
+            if currentIndex > 0 {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    currentMagnet = groupItems[currentIndex - 1]
+                    refreshTrigger.toggle()
+                }
+            }
+        } else if translation.width < 0 {
+            // 左滑：切换到下一个
+            if currentIndex < groupItems.count - 1 {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    currentMagnet = groupItems[currentIndex + 1]
+                    refreshTrigger.toggle()
+                }
+            }
+        }
     }
     
     private func deleteMagnet() {
