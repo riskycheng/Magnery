@@ -379,7 +379,7 @@ struct SegmentationView: View {
                                 Spacer()
                             }
                             .padding(.top, 20)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            .transition(.opacity)
                         }
                         
                         Spacer()
@@ -387,6 +387,8 @@ struct SegmentationView: View {
                         if !isProcessing {
                             HStack(spacing: 60) {
                                 Button(action: {
+                                    let impact = UIImpactFeedbackGenerator(style: .light)
+                                    impact.impactOccurred()
                                     dismiss()
                                 }) {
                                     Circle()
@@ -401,6 +403,8 @@ struct SegmentationView: View {
                                 
                                 Button(action: {
                                     if segmentedImage != nil {
+                                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                                        impact.impactOccurred()
                                         showingAddView = true
                                     }
                                 }) {
@@ -416,6 +420,8 @@ struct SegmentationView: View {
                                 .disabled(segmentedImage == nil)
                                 
                                 Button(action: {
+                                    let impact = UIImpactFeedbackGenerator(style: .light)
+                                    impact.impactOccurred()
                                     showingCropView = true
                                 }) {
                                     Circle()
@@ -429,28 +435,52 @@ struct SegmentationView: View {
                                 }
                             }
                             .padding(.bottom, 40)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            .transition(.opacity)
                         }
                     }
                     
-                    if let image = segmentedImage {
+                    if let image = segmentedImage, foregroundOpacity > 0 {
+                        let maxWidth = geometry.size.width * 0.85
+                        let maxHeight = geometry.size.height * 0.75
+                        let imageSize = image.size
+                        let widthRatio = maxWidth / imageSize.width
+                        let heightRatio = maxHeight / imageSize.height
+                        let ratio = min(widthRatio, heightRatio)
+                        let finalWidth = imageSize.width * ratio
+                        let finalHeight = imageSize.height * ratio
+                        
                         ZStack {
                             Image(uiImage: image)
                                 .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxWidth: geometry.size.width * 0.85, maxHeight: geometry.size.height * 0.75)
+                                .frame(width: finalWidth, height: finalHeight)
                                 .scaleEffect(foregroundScale)
                                 .opacity(foregroundOpacity)
-                                .offset(y: foregroundYOffset)
                                 .shadow(color: .white.opacity(0.3 * foregroundOpacity), radius: 20, x: 0, y: 0)
+                                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                                .onAppear {
+                                    print("🔵 Image appeared - Scale: \(foregroundScale), Opacity: \(foregroundOpacity)")
+                                    print("🔵 Geometry size: \(geometry.size)")
+                                    print("🔵 Image size: \(imageSize)")
+                                    print("🔵 Final size: \(finalWidth) x \(finalHeight)")
+                                    print("🔵 Position: center (\(geometry.size.width / 2), \(geometry.size.height / 2))")
+                                }
+                                .onChange(of: foregroundScale) { oldValue, newValue in
+                                    print("📏 Scale changed: \(oldValue) → \(newValue)")
+                                }
+                                .onChange(of: foregroundOpacity) { oldValue, newValue in
+                                    print("👁️ Opacity changed: \(oldValue) → \(newValue)")
+                                }
                             
                             if showBorder, let outline = outlineImage {
                                 AnimatedGlowOutline(outlineImage: outline)
-                                    .frame(maxWidth: geometry.size.width * 0.85, maxHeight: geometry.size.height * 0.75)
+                                    .frame(width: finalWidth, height: finalHeight)
                                     .scaleEffect(foregroundScale)
                                     .opacity(foregroundOpacity)
-                                    .offset(y: foregroundYOffset)
+                                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
                             }
+                        }
+                        .onChange(of: geometry.size) { oldValue, newValue in
+                            print("📐 Geometry size changed: \(oldValue) → \(newValue)")
                         }
                     }
                 }
@@ -514,32 +544,44 @@ struct SegmentationView: View {
                     
                     if let paddedImage = ImageOutlineHelper.addPadding(to: result.image, amount: padding) {
                         self.segmentedImage = paddedImage
+                        print("✅ Segmented image set (padded): \(paddedImage.size)")
                         self.outlineImage = ImageOutlineHelper.createOutline(from: paddedImage, lineWidth: lineWidth, offset: offset)
                     } else {
                         self.segmentedImage = result.image
+                        print("✅ Segmented image set (original): \(result.image.size)")
                         self.outlineImage = ImageOutlineHelper.createOutline(from: result.image, lineWidth: lineWidth, offset: offset)
                     }
                     
+                    print("🎬 Starting animation sequence...")
+                    print("   Initial state - Scale: \(self.foregroundScale), Opacity: \(self.foregroundOpacity)")
+                    
                     withAnimation(.easeIn(duration: 0.8)) {
                         self.vignetteIntensity = 0.6
+                        print("🌑 Vignette intensity: 0 → 0.6")
                     }
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        print("💥 Particles and blur starting...")
                         self.showBackgroundParticles = true
                         self.showParticles = true
                         
                         withAnimation(.easeOut(duration: 0.5)) {
                             self.vignetteIntensity = 0.0
                             self.contourFocus = 1.0
+                            print("🌑 Vignette intensity: 0.6 → 0")
                         }
                         
                         withAnimation(.easeOut(duration: 0.6)) {
                             self.backgroundBlur = 30
+                            print("🌫️ Background blur: 0 → 30")
                         }
                         
+                        print("🎯 Object reveal animation starting (delay 0.2s)...")
                         withAnimation(.interpolatingSpring(stiffness: 100, damping: 12).delay(0.2)) {
+                            print("   Before animation - Scale: \(self.foregroundScale), Opacity: \(self.foregroundOpacity)")
+                            self.foregroundScale = 1.15
                             self.foregroundOpacity = 1.0
-                            self.foregroundYOffset = -30
+                            print("   After animation - Scale: 1.15, Opacity: 1.0")
                         }
                         
                         let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
@@ -555,7 +597,7 @@ struct SegmentationView: View {
                             }
                             
                             withAnimation(.interpolatingSpring(stiffness: 120, damping: 15)) {
-                                self.foregroundYOffset = 0
+                                self.foregroundScale = 1.0
                             }
                             
                             let notificationSuccess = UINotificationFeedbackGenerator()

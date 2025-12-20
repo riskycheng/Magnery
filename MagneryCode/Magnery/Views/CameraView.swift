@@ -96,6 +96,8 @@ struct CameraView: View {
                     
                     HStack(spacing: 60) {
                         Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .light)
+                            impact.impactOccurred()
                             cameraManager.stopSession()
                             dismiss()
                         }) {
@@ -110,6 +112,8 @@ struct CameraView: View {
                         }
                         
                         Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
                             cameraManager.capturePhoto()
                         }) {
                             ZStack {
@@ -135,6 +139,8 @@ struct CameraView: View {
                         }
                         
                         Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .light)
+                            impact.impactOccurred()
                             cameraManager.stopSession()
                             showingImagePicker = true
                         }) {
