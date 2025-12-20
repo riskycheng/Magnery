@@ -219,6 +219,7 @@ struct ParticleSystem: View {
     }
 }
 
+
 struct AnimatedGlowOutline: View {
     let outlineImage: UIImage
     @State private var glowIntensity: Double = 0.0
@@ -291,12 +292,14 @@ struct SegmentationView: View {
     @State private var backgroundBlur: CGFloat = 0
     @State private var showBorder = false
     @State private var currentImage: UIImage
-    @State private var foregroundScale: CGFloat = 0.8
+    @State private var foregroundScale: CGFloat = 1.0
     @State private var foregroundOpacity: Double = 0.0
-    @State private var foregroundRotation: Double = -15.0
+    @State private var foregroundYOffset: CGFloat = 0
     @State private var showParticles = false
     @State private var showBackgroundParticles = false
     @State private var processingPhase: ProcessingPhase = .initial
+    @State private var vignetteIntensity: CGFloat = 0.0
+    @State private var contourFocus: CGFloat = 0.0
     
     enum ProcessingPhase {
         case initial
@@ -312,18 +315,37 @@ struct SegmentationView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                Color.black
-                    .ignoresSafeArea()
-                
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+            
+            GeometryReader { geometry in
                 Image(uiImage: currentImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
                     .blur(radius: backgroundBlur)
                     .opacity(isProcessing ? 0.3 : 0.2)
-                    .ignoresSafeArea()
+            }
+            .ignoresSafeArea()
+                
+            GeometryReader { geometry in
+                if isProcessing {
+                    Rectangle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    .clear,
+                                    .black.opacity(vignetteIntensity)
+                                ],
+                                center: .center,
+                                startRadius: 100,
+                                endRadius: 400
+                            )
+                        )
+                        .ignoresSafeArea()
+                }
                 
                 if showBackgroundParticles {
                     BackgroundParticleSystem(screenSize: geometry.size)
@@ -344,155 +366,92 @@ struct SegmentationView: View {
                     .ignoresSafeArea()
                 }
                 
-                VStack {
-                    if !isProcessing {
-                        HStack {
-                            Text(dateString)
-                                .font(.title2)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                                .padding(.leading, 20)
-                            
-                            Spacer()
-                        }
-                        .padding(.top, 20)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-                    
-                    Spacer()
-                    
-                    ZStack {
-                        if isProcessing {
-                            ZStack {
-                                Circle()
-                                    .stroke(
-                                        AngularGradient(
-                                            colors: [
-                                                .cyan, .blue, .purple, .pink, .cyan
-                                            ],
-                                            center: .center
-                                        ),
-                                        lineWidth: 5
-                                    )
-                                    .frame(width: 120, height: 120)
-                                    .rotationEffect(.degrees(rotation))
+                ZStack {
+                    VStack {
+                        if !isProcessing {
+                            HStack {
+                                Text(dateString)
+                                    .font(.title2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                    .padding(.leading, 20)
                                 
-                                Circle()
-                                    .trim(from: 0, to: 0.7)
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [.white.opacity(0.8), .clear],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        ),
-                                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
-                                    )
-                                    .frame(width: 120, height: 120)
-                                    .rotationEffect(.degrees(-rotation * 1.5))
-                                
-                                Circle()
-                                    .stroke(
-                                        RadialGradient(
-                                            colors: [.white.opacity(0.3), .clear],
-                                            center: .center,
-                                            startRadius: 40,
-                                            endRadius: 60
-                                        ),
-                                        lineWidth: 8
-                                    )
-                                    .frame(width: 120, height: 120)
-                                    .rotationEffect(.degrees(rotation * 0.5))
+                                Spacer()
                             }
-                            .shadow(color: .cyan.opacity(0.6), radius: 30, x: 0, y: 0)
-                            .shadow(color: .blue.opacity(0.4), radius: 50, x: 0, y: 0)
-                            .onAppear {
-                                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                                    rotation = 360
-                                }
-                            }
+                            .padding(.top, 20)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                         
-                        if let image = segmentedImage, !isProcessing {
-                            ZStack {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(maxHeight: UIScreen.main.bounds.height * 0.5)
-                                    .scaleEffect(foregroundScale)
-                                    .opacity(foregroundOpacity)
-                                    .rotation3DEffect(
-                                        .degrees(foregroundRotation),
-                                        axis: (x: 0, y: 1, z: 0),
-                                        perspective: 0.5
-                                    )
-                                    .shadow(color: .white.opacity(0.3), radius: 20, x: 0, y: 0)
-                                    .padding(40)
-                                
-                                if showBorder, let outline = outlineImage {
-                                    AnimatedGlowOutline(outlineImage: outline)
-                                        .frame(maxHeight: UIScreen.main.bounds.height * 0.5)
-                                        .scaleEffect(foregroundScale)
-                                        .opacity(foregroundOpacity)
-                                        .rotation3DEffect(
-                                            .degrees(foregroundRotation),
-                                            axis: (x: 0, y: 1, z: 0),
-                                            perspective: 0.5
+                        Spacer()
+                        
+                        if !isProcessing {
+                            HStack(spacing: 60) {
+                                Button(action: {
+                                    dismiss()
+                                }) {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.8))
+                                        .frame(width: 60, height: 60)
+                                        .overlay(
+                                            Image(systemName: "arrow.counterclockwise")
+                                                .font(.title2)
+                                                .foregroundColor(.white)
                                         )
-                                        .padding(40)
+                                }
+                                
+                                Button(action: {
+                                    if segmentedImage != nil {
+                                        showingAddView = true
+                                    }
+                                }) {
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 70, height: 70)
+                                        .overlay(
+                                            Image(systemName: "checkmark")
+                                                .font(.title)
+                                                .foregroundColor(.black)
+                                        )
+                                }
+                                .disabled(segmentedImage == nil)
+                                
+                                Button(action: {
+                                    showingCropView = true
+                                }) {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.8))
+                                        .frame(width: 60, height: 60)
+                                        .overlay(
+                                            Image(systemName: "crop")
+                                                .font(.title2)
+                                                .foregroundColor(.white)
+                                        )
                                 }
                             }
+                            .padding(.bottom, 40)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
                     }
-                    .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
-                
-                    Spacer()
                     
-                    if !isProcessing {
-                        HStack(spacing: 60) {
-                            Button(action: {
-                                dismiss()
-                            }) {
-                                Circle()
-                                    .fill(Color.gray.opacity(0.8))
-                                    .frame(width: 60, height: 60)
-                                    .overlay(
-                                        Image(systemName: "arrow.counterclockwise")
-                                            .font(.title2)
-                                            .foregroundColor(.white)
-                                    )
-                            }
+                    if let image = segmentedImage {
+                        ZStack {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(maxWidth: geometry.size.width * 0.85, maxHeight: geometry.size.height * 0.75)
+                                .scaleEffect(foregroundScale)
+                                .opacity(foregroundOpacity)
+                                .offset(y: foregroundYOffset)
+                                .shadow(color: .white.opacity(0.3 * foregroundOpacity), radius: 20, x: 0, y: 0)
                             
-                            Button(action: {
-                                if segmentedImage != nil {
-                                    showingAddView = true
-                                }
-                            }) {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 70, height: 70)
-                                    .overlay(
-                                        Image(systemName: "checkmark")
-                                            .font(.title)
-                                            .foregroundColor(.black)
-                                    )
-                            }
-                            .disabled(segmentedImage == nil)
-                            
-                            Button(action: {
-                                showingCropView = true
-                            }) {
-                                Circle()
-                                    .fill(Color.gray.opacity(0.8))
-                                    .frame(width: 60, height: 60)
-                                    .overlay(
-                                        Image(systemName: "crop")
-                                            .font(.title2)
-                                            .foregroundColor(.white)
-                                    )
+                            if showBorder, let outline = outlineImage {
+                                AnimatedGlowOutline(outlineImage: outline)
+                                    .frame(maxWidth: geometry.size.width * 0.85, maxHeight: geometry.size.height * 0.75)
+                                    .scaleEffect(foregroundScale)
+                                    .opacity(foregroundOpacity)
+                                    .offset(y: foregroundYOffset)
                             }
                         }
-                        .padding(.bottom, 40)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                 }
             }
@@ -530,12 +489,14 @@ struct SegmentationView: View {
         showBorder = false
         segmentedImage = nil
         outlineImage = nil
-        foregroundScale = 0.8
+        foregroundScale = 1.0
         foregroundOpacity = 0.0
-        foregroundRotation = -15.0
+        foregroundYOffset = 0
         showParticles = false
         showBackgroundParticles = false
         processingPhase = .initial
+        vignetteIntensity = 0.0
+        contourFocus = 0.0
         
         VisionService.shared.removeBackground(from: currentImage) { result in
             DispatchQueue.main.async {
@@ -559,58 +520,57 @@ struct SegmentationView: View {
                         self.outlineImage = ImageOutlineHelper.createOutline(from: result.image, lineWidth: lineWidth, offset: offset)
                     }
                     
-                    self.showBackgroundParticles = true
-                    
-                    withAnimation(.easeOut(duration: 1.5)) {
-                        self.backgroundBlur = 30
+                    withAnimation(.easeIn(duration: 0.8)) {
+                        self.vignetteIntensity = 0.6
                     }
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        self.showBackgroundParticles = true
                         self.showParticles = true
+                        
+                        withAnimation(.easeOut(duration: 0.5)) {
+                            self.vignetteIntensity = 0.0
+                            self.contourFocus = 1.0
+                        }
+                        
+                        withAnimation(.easeOut(duration: 0.6)) {
+                            self.backgroundBlur = 30
+                        }
+                        
+                        withAnimation(.interpolatingSpring(stiffness: 100, damping: 12).delay(0.2)) {
+                            self.foregroundOpacity = 1.0
+                            self.foregroundYOffset = -30
+                        }
                         
                         let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
                         impactHeavy.prepare()
-                        impactHeavy.impactOccurred()
                         
-                        withAnimation(.interpolatingSpring(stiffness: 80, damping: 12)) {
-                            self.foregroundScale = 1.08
-                            self.foregroundOpacity = 1.0
-                            self.foregroundRotation = 0.0
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            impactHeavy.impactOccurred()
                         }
                         
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                            let impactMedium = UIImpactFeedbackGenerator(style: .medium)
-                            impactMedium.impactOccurred()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            withAnimation(.easeInOut(duration: 0.8)) {
+                                self.showBorder = true
+                            }
                             
                             withAnimation(.interpolatingSpring(stiffness: 120, damping: 15)) {
-                                self.foregroundScale = 1.0
-                            }
-                        }
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                            withAnimation(.easeInOut(duration: 1.0)) {
-                                self.showBorder = true
-                                self.processingPhase = .complete
+                                self.foregroundYOffset = 0
                             }
                             
                             let notificationSuccess = UINotificationFeedbackGenerator()
                             notificationSuccess.notificationOccurred(.success)
+                        }
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            withAnimation(.easeOut(duration: 0.4)) {
+                                self.isProcessing = false
+                            }
                             
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                                withAnimation(.easeOut(duration: 0.5)) {
-                                    self.isProcessing = false
-                                }
-                                
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                    withAnimation(.easeOut(duration: 0.3)) {
-                                        self.showParticles = false
-                                    }
-                                    
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                                        withAnimation(.easeOut(duration: 0.4)) {
-                                            self.showBackgroundParticles = false
-                                        }
-                                    }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                withAnimation(.easeOut(duration: 0.4)) {
+                                    self.showParticles = false
+                                    self.showBackgroundParticles = false
                                 }
                             }
                         }
