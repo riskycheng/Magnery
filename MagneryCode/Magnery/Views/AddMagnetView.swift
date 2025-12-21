@@ -147,7 +147,10 @@ struct AddMagnetView: View {
                             Button(action: {
                                 let impact = UIImpactFeedbackGenerator(style: .light)
                                 impact.impactOccurred()
-                                processImage()
+                                // 重置所有已填入的内容
+                                name = ""
+                                notes = ""
+                                location = "未知位置"
                             }) {
                                 Circle()
                                     .fill(Color.white)
@@ -181,7 +184,12 @@ struct AddMagnetView: View {
                             Button(action: {
                                 let impact = UIImpactFeedbackGenerator(style: .light)
                                 impact.impactOccurred()
+                                // 取消并返回相机页面
                                 dismiss()
+                                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                   let window = windowScene.windows.first {
+                                    window.rootViewController?.dismiss(animated: true)
+                                }
                             }) {
                                 Circle()
                                     .fill(Color.white)
