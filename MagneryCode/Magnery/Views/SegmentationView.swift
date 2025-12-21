@@ -1,283 +1,22 @@
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 
-struct Particle: Identifiable {
-    let id = UUID()
-    var position: CGPoint
-    var velocity: CGPoint
-    var opacity: Double
-    var scale: CGFloat
-    var color: Color
-    var lifetime: Double
-}
-
-struct BackgroundParticleSystem: View {
-    @State private var particles: [Particle] = []
-    let screenSize: CGSize
-    
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            Canvas { context, size in
-                let now = timeline.date.timeIntervalSinceReferenceDate
-                
-                for particle in particles {
-                    let age = now - particle.lifetime
-                    if age > 3.0 { continue }
-                    
-                    let progress = age / 3.0
-                    let currentOpacity = particle.opacity * (1.0 - progress)
-                    let currentScale = particle.scale * (1.0 + progress * 2.0)
-                    
-                    var particleContext = context
-                    particleContext.opacity = currentOpacity
-                    
-                    let rect = CGRect(
-                        x: particle.position.x - currentScale / 2,
-                        y: particle.position.y - currentScale / 2,
-                        width: currentScale,
-                        height: currentScale
-                    )
-                    
-                    particleContext.fill(
-                        Path(ellipseIn: rect),
-                        with: .color(particle.color)
-                    )
-                }
-            }
-        }
-        .onAppear {
-            generateBackgroundParticles()
-            startBackgroundAnimation()
-        }
-    }
-    
-    private func generateBackgroundParticles() {
-        let colors: [Color] = [
-            .white.opacity(0.6), .cyan.opacity(0.5), .blue.opacity(0.4),
-            .purple.opacity(0.3), .pink.opacity(0.3)
-        ]
-        
-        particles = (0..<200).map { _ in
-            let angle = Double.random(in: 0...(2 * .pi))
-            let speed = CGFloat.random(in: 100...300)
-            let startX = screenSize.width / 2
-            let startY = screenSize.height / 2
-            
-            return Particle(
-                position: CGPoint(
-                    x: startX + CGFloat.random(in: -100...100),
-                    y: startY + CGFloat.random(in: -100...100)
-                ),
-                velocity: CGPoint(
-                    x: cos(angle) * speed,
-                    y: sin(angle) * speed
-                ),
-                opacity: Double.random(in: 0.3...0.7),
-                scale: CGFloat.random(in: 2...6),
-                color: colors.randomElement() ?? .white,
-                lifetime: Date().timeIntervalSinceReferenceDate
-            )
-        }
-    }
-    
-    private func startBackgroundAnimation() {
-        Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { timer in
-            if particles.isEmpty {
-                timer.invalidate()
-                return
-            }
-            
-            let now = Date().timeIntervalSinceReferenceDate
-            particles = particles.map { particle in
-                var updated = particle
-                let dt: CGFloat = 0.016
-                updated.position.x += particle.velocity.x * dt
-                updated.position.y += particle.velocity.y * dt
-                return updated
-            }.filter { now - $0.lifetime < 3.0 }
-        }
-    }
-}
-
-struct ParticleSystem: View {
-    let particleCount: Int
-    let sourceRect: CGRect
-    @State private var particles: [Particle] = []
-    @State private var isAnimating = false
-    
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            Canvas { context, size in
-                let now = timeline.date.timeIntervalSinceReferenceDate
-                
-                for particle in particles {
-                    let age = now - particle.lifetime
-                    if age > 2.0 { continue }
-                    
-                    let progress = age / 2.0
-                    let currentOpacity = particle.opacity * (1.0 - progress)
-                    let currentScale = particle.scale * (1.0 + progress * 0.5)
-                    
-                    var particleContext = context
-                    particleContext.opacity = currentOpacity
-                    
-                    let rect = CGRect(
-                        x: particle.position.x - currentScale / 2,
-                        y: particle.position.y - currentScale / 2,
-                        width: currentScale,
-                        height: currentScale
-                    )
-                    
-                    particleContext.fill(
-                        Path(ellipseIn: rect),
-                        with: .color(particle.color)
-                    )
-                }
-            }
-        }
-        .onAppear {
-            generateParticles()
-            startAnimation()
-        }
-    }
-    
-    private func generateParticles() {
-        let colors: [Color] = [
-            .white, .blue.opacity(0.8), .cyan.opacity(0.8),
-            .purple.opacity(0.6), .pink.opacity(0.6)
-        ]
-        
-        particles = (0..<particleCount).map { _ in
-            let angle = Double.random(in: 0...(2 * .pi))
-            let speed = CGFloat.random(in: 50...150)
-            
-            return Particle(
-                position: CGPoint(
-                    x: sourceRect.midX + CGFloat.random(in: -sourceRect.width/4...sourceRect.width/4),
-                    y: sourceRect.midY + CGFloat.random(in: -sourceRect.height/4...sourceRect.height/4)
-                ),
-                velocity: CGPoint(
-                    x: cos(angle) * speed,
-                    y: sin(angle) * speed
-                ),
-                opacity: Double.random(in: 0.4...0.9),
-                scale: CGFloat.random(in: 3...8),
-                color: colors.randomElement() ?? .white,
-                lifetime: Date().timeIntervalSinceReferenceDate
-            )
-        }
-    }
-    
-    private func startAnimation() {
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-            if particles.isEmpty {
-                timer.invalidate()
-                return
-            }
-            
-            let now = Date().timeIntervalSinceReferenceDate
-            particles = particles.map { particle in
-                var updated = particle
-                let dt: CGFloat = 0.016
-                updated.position.x += particle.velocity.x * dt
-                updated.position.y += particle.velocity.y * dt
-                return updated
-            }.filter { now - $0.lifetime < 2.0 }
-            
-            if particles.count < particleCount / 2 {
-                let newParticles = generateNewParticles(count: 5)
-                particles.append(contentsOf: newParticles)
-            }
-        }
-    }
-    
-    private func generateNewParticles(count: Int) -> [Particle] {
-        let colors: [Color] = [
-            .white, .blue.opacity(0.8), .cyan.opacity(0.8),
-            .purple.opacity(0.6), .pink.opacity(0.6)
-        ]
-        
-        return (0..<count).map { _ in
-            let angle = Double.random(in: 0...(2 * .pi))
-            let speed = CGFloat.random(in: 50...150)
-            
-            return Particle(
-                position: CGPoint(
-                    x: sourceRect.midX + CGFloat.random(in: -sourceRect.width/4...sourceRect.width/4),
-                    y: sourceRect.midY + CGFloat.random(in: -sourceRect.height/4...sourceRect.height/4)
-                ),
-                velocity: CGPoint(
-                    x: cos(angle) * speed,
-                    y: sin(angle) * speed
-                ),
-                opacity: Double.random(in: 0.4...0.9),
-                scale: CGFloat.random(in: 3...8),
-                color: colors.randomElement() ?? .white,
-                lifetime: Date().timeIntervalSinceReferenceDate
-            )
-        }
-    }
-}
-
-
+// Simplified, lightweight glow effect (no continuous animations)
 struct AnimatedGlowOutline: View {
     let outlineImage: UIImage
     @State private var glowIntensity: Double = 0.0
-    @State private var rotation: Double = 0.0
     
     var body: some View {
-        ZStack {
-            Image(uiImage: outlineImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .shadow(color: .cyan.opacity(glowIntensity * 0.8), radius: 20, x: 0, y: 0)
-                .shadow(color: .blue.opacity(glowIntensity * 0.6), radius: 30, x: 0, y: 0)
-                .shadow(color: .purple.opacity(glowIntensity * 0.4), radius: 40, x: 0, y: 0)
-            
-            FlowingOutlineView(outlineImage: outlineImage)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                glowIntensity = 1.0
-            }
-        }
-    }
-}
-
-struct FlowingOutlineView: View {
-    let outlineImage: UIImage
-    
-    var body: some View {
-        TimelineView(.animation) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            let period: Double = 1.5
-            let progress = (time.truncatingRemainder(dividingBy: period)) / period
-            let offset = CGFloat(progress) * 30.0
-            
-            Canvas { ctx, size in
-                let dashWidth: CGFloat = 10
-                let gapWidth: CGFloat = 5
-                let patternWidth = dashWidth + gapWidth
-                let height = size.height
-                let width = size.width
-                
-                let start = -20
-                let end = Int(height / patternWidth) + 20
-                
-                for i in start..<end {
-                    let y = CGFloat(i) * patternWidth + offset
-                    var path = Path()
-                    path.move(to: CGPoint(x: 0, y: y))
-                    path.addLine(to: CGPoint(x: width, y: y))
-                    ctx.stroke(path, with: .color(.white), lineWidth: dashWidth)
+        Image(uiImage: outlineImage)
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .shadow(color: .white.opacity(0.6), radius: 15, x: 0, y: 0)
+            .shadow(color: .blue.opacity(0.4), radius: 25, x: 0, y: 0)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.0)) {
+                    glowIntensity = 1.0
                 }
             }
-        }
-        .mask(
-            Image(uiImage: outlineImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        )
     }
 }
 
@@ -295,11 +34,9 @@ struct SegmentationView: View {
     @State private var foregroundScale: CGFloat = 1.0
     @State private var foregroundOpacity: Double = 0.0
     @State private var foregroundYOffset: CGFloat = 0
-    @State private var showParticles = false
-    @State private var showBackgroundParticles = false
     @State private var processingPhase: ProcessingPhase = .initial
-    @State private var vignetteIntensity: CGFloat = 0.0
-    @State private var contourFocus: CGFloat = 0.0
+    @State private var noObjectDetected = false
+    @State private var processingText = "识别中..."
     
     enum ProcessingPhase {
         case initial
@@ -331,44 +68,60 @@ struct SegmentationView: View {
             .ignoresSafeArea()
                 
             GeometryReader { geometry in
-                if isProcessing {
-                    Rectangle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    .clear,
-                                    .black.opacity(vignetteIntensity)
-                                ],
-                                center: .center,
-                                startRadius: 100,
-                                endRadius: 400
-                            )
-                        )
-                        .ignoresSafeArea()
-                }
-                
-                if showBackgroundParticles {
-                    BackgroundParticleSystem(screenSize: geometry.size)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                }
-                
-                if showParticles {
-                    ParticleSystem(
-                        particleCount: 80,
-                        sourceRect: CGRect(
-                            x: geometry.size.width / 2 - 100,
-                            y: geometry.size.height / 2 - 100,
-                            width: 200,
-                            height: 200
-                        )
-                    )
-                    .ignoresSafeArea()
-                }
+                // Simplified effects for performance
                 
                 ZStack {
+                    // Processing indicator
+                    if isProcessing {
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                            
+                            Text(processingText)
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .shadow(radius: 2)
+                        }
+                        .transition(.opacity)
+                        .zIndex(10)
+                    }
+                    
+                    // No object detected message
+                    if noObjectDetected {
+                        VStack(spacing: 30) {
+                            Image(systemName: "viewfinder")
+                                .font(.system(size: 60))
+                                .foregroundColor(.white)
+                            
+                            VStack(spacing: 10) {
+                                Text("未检测到明显对象")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                
+                                Text("将保存完整图片")
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                            
+                            Button(action: {
+                                showingAddView = true
+                            }) {
+                                Text("继续")
+                                    .font(.headline)
+                                    .foregroundColor(.black)
+                                    .frame(width: 120, height: 50)
+                                    .background(Color.white)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .transition(.opacity)
+                        .zIndex(10)
+                    }
+                    
                     VStack {
-                        if !isProcessing {
+                        if !isProcessing && !noObjectDetected {
                             HStack {
                                 Text(dateString)
                                     .font(.title2)
@@ -384,7 +137,7 @@ struct SegmentationView: View {
                         
                         Spacer()
                         
-                        if !isProcessing {
+                        if !isProcessing && !noObjectDetected {
                             HStack(spacing: 60) {
                                 Button(action: {
                                     let impact = UIImpactFeedbackGenerator(style: .light)
@@ -520,6 +273,8 @@ struct SegmentationView: View {
     
     private func processImage() {
         isProcessing = true
+        noObjectDetected = false
+        processingText = "识别中..."
         backgroundBlur = 0
         showBorder = false
         segmentedImage = nil
@@ -527,21 +282,25 @@ struct SegmentationView: View {
         foregroundScale = 1.0
         foregroundOpacity = 0.0
         foregroundYOffset = 0
-        showParticles = false
-        showBackgroundParticles = false
         processingPhase = .initial
-        vignetteIntensity = 0.0
-        contourFocus = 0.0
         
         VisionService.shared.removeBackground(from: currentImage) { result in
             DispatchQueue.main.async {
                 if let result = result {
                     withAnimation {
                         processingPhase = .enhancing
+                        self.processingText = "处理中..."
                     }
                     
-                    let displayHeight = UIScreen.main.bounds.height * 0.5
-                    let scaleFactor = result.image.size.height / displayHeight
+                    // Use maxHeight to fit screen better
+                    let screenSize = UIScreen.main.bounds
+                    let maxDisplayHeight = screenSize.height * 0.6  // 60% of screen height
+                    let maxDisplayWidth = screenSize.width * 0.85   // 85% of screen width
+                    
+                    // Calculate scale factor based on both dimensions
+                    let heightRatio = result.image.size.height / maxDisplayHeight
+                    let widthRatio = result.image.size.width / maxDisplayWidth
+                    let scaleFactor = max(heightRatio, widthRatio)
                     
                     let offset = 10.0 * scaleFactor
                     let lineWidth = 4.0 * scaleFactor
@@ -557,74 +316,55 @@ struct SegmentationView: View {
                         self.outlineImage = ImageOutlineHelper.createOutline(from: result.image, lineWidth: lineWidth, offset: offset)
                     }
                     
-                    print("🎬 Starting animation sequence...")
-                    print("   Initial state - Scale: \(self.foregroundScale), Opacity: \(self.foregroundOpacity)")
+                    // Simplified animation sequence for performance
+                    print("🎬 Starting simplified animation...")
                     
-                    withAnimation(.easeIn(duration: 0.8)) {
-                        self.vignetteIntensity = 0.6
-                        print("🌑 Vignette intensity: 0 → 0.6")
+                    withAnimation(.easeOut(duration: 0.4)) {
+                        self.backgroundBlur = 30
                     }
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        print("💥 Particles and blur starting...")
-                        self.showBackgroundParticles = true
-                        self.showParticles = true
-                        
-                        withAnimation(.easeOut(duration: 0.5)) {
-                            self.vignetteIntensity = 0.0
-                            self.contourFocus = 1.0
-                            print("🌑 Vignette intensity: 0.6 → 0")
+                    withAnimation(.interpolatingSpring(stiffness: 120, damping: 15).delay(0.2)) {
+                        self.foregroundScale = 1.1
+                        self.foregroundOpacity = 1.0
+                    }
+                    
+                    let impactHeavy = UIImpactFeedbackGenerator(style: .medium)
+                    impactHeavy.prepare()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        impactHeavy.impactOccurred()
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        withAnimation(.easeInOut(duration: 0.6)) {
+                            self.showBorder = true
+                            self.foregroundScale = 1.0
                         }
                         
-                        withAnimation(.easeOut(duration: 0.6)) {
-                            self.backgroundBlur = 30
-                            print("🌫️ Background blur: 0 → 30")
-                        }
-                        
-                        print("🎯 Object reveal animation starting (delay 0.2s)...")
-                        withAnimation(.interpolatingSpring(stiffness: 100, damping: 12).delay(0.2)) {
-                            print("   Before animation - Scale: \(self.foregroundScale), Opacity: \(self.foregroundOpacity)")
-                            self.foregroundScale = 1.15
-                            self.foregroundOpacity = 1.0
-                            print("   After animation - Scale: 1.15, Opacity: 1.0")
-                        }
-                        
-                        let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
-                        impactHeavy.prepare()
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            impactHeavy.impactOccurred()
-                        }
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            withAnimation(.easeInOut(duration: 0.8)) {
-                                self.showBorder = true
-                            }
-                            
-                            withAnimation(.interpolatingSpring(stiffness: 120, damping: 15)) {
-                                self.foregroundScale = 1.0
-                            }
-                            
-                            let notificationSuccess = UINotificationFeedbackGenerator()
-                            notificationSuccess.notificationOccurred(.success)
-                        }
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            withAnimation(.easeOut(duration: 0.4)) {
-                                self.isProcessing = false
-                            }
-                            
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                withAnimation(.easeOut(duration: 0.4)) {
-                                    self.showParticles = false
-                                    self.showBackgroundParticles = false
-                                }
-                            }
+                        let notificationSuccess = UINotificationFeedbackGenerator()
+                        notificationSuccess.notificationOccurred(.success)
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            self.isProcessing = false
                         }
                     }
                 } else {
-                    self.segmentedImage = originalImage
+                    // No object detected
+                    print("⚠️ No foreground object detected, using original image")
+                    self.segmentedImage = self.originalImage
+                    self.noObjectDetected = true
                     self.isProcessing = false
+                    
+                    // Show "no object" message for 2 seconds, then auto-continue
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        if self.noObjectDetected {
+                            withAnimation {
+                                self.noObjectDetected = false
+                                self.showingAddView = true
+                            }
+                        }
+                    }
                 }
             }
         }

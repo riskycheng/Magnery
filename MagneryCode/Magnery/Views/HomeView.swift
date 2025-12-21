@@ -4,9 +4,6 @@ struct HomeView: View {
     @EnvironmentObject var store: MagnetStore
     @State private var showingCamera = false
     @State private var ringRotation: Double = 0
-    @State private var cameraScale: CGFloat = 1.0
-    @State private var showGroupingToggle = false
-    @State private var dotScales: [CGFloat] = Array(repeating: 1.0, count: 8)
     @State private var scrollOffset: CGFloat = 0
     @State private var isCollapsed = false
     @State private var lastScrollUpdate: CGFloat = 0
@@ -56,18 +53,19 @@ struct HomeView: View {
                         let newCollapsed = value < -collapsedThreshold
                         
                         // Always update if collapse state changes, otherwise throttle updates
-                        if newCollapsed != isCollapsed || difference > scrollUpdateThreshold {
-                            withTransaction(Transaction(animation: nil)) {
-                                scrollOffset = value
-                                lastScrollUpdate = value
-                            }
+                        if newCollapsed != isCollapsed {
+                            // State change - update immediately
+                            isCollapsed = newCollapsed
+                            scrollOffset = value
+                            lastScrollUpdate = value
                             
-                            if newCollapsed != isCollapsed {
-                                isCollapsed = newCollapsed
-                                // Haptic feedback
-                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                impact.impactOccurred()
-                            }
+                            // Haptic feedback
+                            let impact = UIImpactFeedbackGenerator(style: .light)
+                            impact.impactOccurred()
+                        } else if difference > scrollUpdateThreshold {
+                            // Normal scroll - throttle updates, no animation
+                            scrollOffset = value
+                            lastScrollUpdate = value
                         }
                     }
                 }
@@ -96,22 +94,13 @@ struct HomeView: View {
     
     // Expanded header content with camera button
     private var expandedHeaderContent: some View {
-        let progress = min(max(-scrollOffset / collapsedThreshold, 0), 1)
-        let scale = 0.3 + (1 - progress) * 0.7  // Scale from 1.0 to 0.3
-        let opacity = 1 - progress
-        
-        return VStack(spacing: 20) {
+        VStack(spacing: 20) {
             headerView
-                .opacity(opacity)
-                .scaleEffect(0.7 + opacity * 0.3)
-            
             cameraButton
-                .scaleEffect(scale)
-                .opacity(opacity)
         }
-        .frame(height: maxHeaderHeight * (0.5 + opacity * 0.5))
+        .frame(height: maxHeaderHeight)
         .padding(.top, 20)
-        .animation(nil, value: scrollOffset)  // Disable implicit animations
+        .opacity(isCollapsed ? 0 : 1)  // Simple show/hide instead of complex calculations
     }
     
     private var headerView: some View {
@@ -137,22 +126,13 @@ struct HomeView: View {
                     }
                 }
             
+            // Dots simplified for performance
             ForEach(0..<8) { index in
                 Circle()
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(Color.gray.opacity(0.25))
                     .frame(width: 6, height: 6)
-                    .scaleEffect(dotScales[index])
                     .offset(y: -115)
                     .rotationEffect(.degrees(Double(index) * 45))
-                    .onAppear {
-                        withAnimation(
-                            Animation.easeInOut(duration: 0.8)
-                                .repeatForever(autoreverses: true)
-                                .delay(Double(index) * 0.1)
-                        ) {
-                            dotScales[index] = 1.8
-                        }
-                    }
             }
             
             Circle()
@@ -167,23 +147,15 @@ struct HomeView: View {
                     .font(.system(size: 32, weight: .light))
                     .foregroundColor(.black)
             }
-            .scaleEffect(cameraScale)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                    cameraScale = 1.15
-                }
-            }
+            // Camera scale animation removed for better performance
         }
         .padding(.vertical, 40)
-        .animation(nil, value: scrollOffset)  // Prevent scroll from interfering with animations
     }
     
     
     private var contentList: some View {
-        let sections = groupedBySection()
-        
-        return VStack(alignment: .leading, spacing: 20) {
-            ForEach(sections, id: \.section) { sectionData in
+        VStack(alignment: .leading, spacing: 20) {
+            ForEach(groupedBySection(), id: \.section) { sectionData in
                 VStack(alignment: .leading, spacing: 12) {
                     if !sectionData.section.isEmpty {
                         Text(sectionData.section)
@@ -205,7 +177,6 @@ struct HomeView: View {
         }
         .padding(.top, 8)
         .padding(.bottom, 40)
-        .animation(nil, value: scrollOffset)  // Prevent scroll from causing unnecessary animations
         .id(store.groupingMode)  // Only re-render when grouping mode changes
     }
     
@@ -263,23 +234,52 @@ struct HomeView: View {
                 return ""
             }
             
-            return groupedByMonth.map { (section, groups) in
-                SectionData(section: section, groups: groups.sorted { $0.items.first!.date > $1.items.first!.date })
-            }.sorted { section1, section2 in
-                guard let date1 = section1.groups.first?.items.first?.date,
-                      let date2 = section2.groups.first?.items.first?.date else {
-                    return false
+            // Sort dictionary keys first to ensure stable ordering
+            let sortedSections = groupedByMonth.keys.sorted { key1, key2 in
+                // Extract dates for comparison
+                if let groups1 = groupedByMonth[key1], let date1 = groups1.first?.items.first?.date,
+                   let groups2 = groupedByMonth[key2], let date2 = groups2.first?.items.first?.date {
+                    return date1 > date2
                 }
-                return date1 > date2
+                return key1 > key2
+            }
+            
+            return sortedSections.map { section in
+                let sectionGroups = groupedByMonth[section] ?? []
+                return SectionData(
+                    section: section,
+                    groups: sectionGroups.sorted { $0.items.first!.date > $1.items.first!.date }
+                )
             }
         } else {
             let groupedByCity = Dictionary(grouping: groups) { group -> String in
                 return extractCityName(from: group.title)
             }
             
-            return groupedByCity.map { (section, groups) in
-                SectionData(section: section, groups: groups.sorted { $0.items.count > $1.items.count })
-            }.sorted { $0.groups.reduce(0) { $0 + $1.items.count } > $1.groups.reduce(0) { $0 + $1.items.count } }
+            // Sort dictionary keys first to ensure stable ordering
+            let sortedCities = groupedByCity.keys.sorted { city1, city2 in
+                let count1 = groupedByCity[city1]?.reduce(0) { $0 + $1.items.count } ?? 0
+                let count2 = groupedByCity[city2]?.reduce(0) { $0 + $1.items.count } ?? 0
+                if count1 == count2 {
+                    // If counts are equal, sort by city name for stability
+                    return city1 < city2
+                }
+                return count1 > count2
+            }
+            
+            return sortedCities.map { city in
+                let cityGroups = groupedByCity[city] ?? []
+                return SectionData(
+                    section: city,
+                    groups: cityGroups.sorted { group1, group2 in
+                        if group1.items.count == group2.items.count {
+                            // If counts are equal, sort by title for stability
+                            return group1.title < group2.title
+                        }
+                        return group1.items.count > group2.items.count
+                    }
+                )
+            }
         }
     }
     
