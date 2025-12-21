@@ -7,6 +7,13 @@ struct HomeView: View {
     @State private var cameraScale: CGFloat = 1.0
     @State private var showGroupingToggle = false
     @State private var dotScales: [CGFloat] = Array(repeating: 1.0, count: 8)
+    @State private var scrollOffset: CGFloat = 0
+    @State private var isCollapsed = false
+    @State private var lastScrollUpdate: CGFloat = 0
+    
+    private let collapsedThreshold: CGFloat = 200
+    private let maxHeaderHeight: CGFloat = 320
+    private let scrollUpdateThreshold: CGFloat = 2  // Only update every 2 points for smoother animation
     
     var body: some View {
         NavigationStack {
@@ -14,46 +21,97 @@ struct HomeView: View {
                 Color(red: 0.95, green: 0.95, blue: 0.97)
                     .ignoresSafeArea()
                 
-                VStack(spacing: 20) {
-                    headerView
+                VStack(spacing: 0) {
+                    // Collapsed header (shown when scrolled)
+                    collapsedHeader
                     
-                    cameraButton
-                    
-                    groupingToggle
-                    
+                    // Main scrollable content
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            ForEach(groupedBySection(), id: \.section) { sectionData in
-                                VStack(alignment: .leading, spacing: 12) {
-                                    if !sectionData.section.isEmpty {
-                                        Text(sectionData.section)
-                                            .font(.title3)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.primary)
-                                            .padding(.horizontal)
-                                    }
-                                    
-                                    ForEach(sectionData.groups) { group in
-                                        NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
-                                            GroupCard(group: group, groupingMode: store.groupingMode)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                        .padding(.horizontal)
-                                    }
-                                }
+                        VStack(spacing: 0) {
+                            // Expanded header content
+                            expandedHeaderContent
+                            
+                            // Grouping toggle
+                            groupingToggle
+                                .padding(.top, 20)
+                                .padding(.bottom, 10)
+                            
+                            // Content list
+                            contentList
+                        }
+                        .background(
+                            GeometryReader { geometry in
+                                Color.clear
+                                    .preference(
+                                        key: ScrollOffsetPreferenceKey.self,
+                                        value: geometry.frame(in: .named("scroll")).minY
+                                    )
+                            }
+                        )
+                    }
+                    .coordinateSpace(name: "scroll")
+                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                        // Only update if the change is significant to reduce redraws
+                        let difference = abs(value - lastScrollUpdate)
+                        let newCollapsed = value < -collapsedThreshold
+                        
+                        // Always update if collapse state changes, otherwise throttle updates
+                        if newCollapsed != isCollapsed || difference > scrollUpdateThreshold {
+                            withTransaction(Transaction(animation: nil)) {
+                                scrollOffset = value
+                                lastScrollUpdate = value
+                            }
+                            
+                            if newCollapsed != isCollapsed {
+                                isCollapsed = newCollapsed
+                                // Haptic feedback
+                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                impact.impactOccurred()
                             }
                         }
-                        .padding(.top, 8)
                     }
-                    .animation(nil, value: ringRotation)
-                    .animation(nil, value: cameraScale)
-                    .animation(nil, value: dotScales)
                 }
             }
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraView()
             }
         }
+    }
+    
+    // Collapsed header shown when scrolled down
+    private var collapsedHeader: some View {
+        HStack {
+            Text(greeting)
+                .font(.caption)
+                .fontWeight(.semibold)
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+        .opacity(isCollapsed ? 1 : 0)
+        .offset(y: isCollapsed ? 0 : -50)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isCollapsed)
+    }
+    
+    // Expanded header content with camera button
+    private var expandedHeaderContent: some View {
+        let progress = min(max(-scrollOffset / collapsedThreshold, 0), 1)
+        let scale = 0.3 + (1 - progress) * 0.7  // Scale from 1.0 to 0.3
+        let opacity = 1 - progress
+        
+        return VStack(spacing: 20) {
+            headerView
+                .opacity(opacity)
+                .scaleEffect(0.7 + opacity * 0.3)
+            
+            cameraButton
+                .scaleEffect(scale)
+                .opacity(opacity)
+        }
+        .frame(height: maxHeaderHeight * (0.5 + opacity * 0.5))
+        .padding(.top, 20)
+        .animation(nil, value: scrollOffset)  // Disable implicit animations
     }
     
     private var headerView: some View {
@@ -66,7 +124,6 @@ struct HomeView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
-        .padding(.top, 20)
     }
     
     private var cameraButton: some View {
@@ -118,8 +175,39 @@ struct HomeView: View {
             }
         }
         .padding(.vertical, 40)
+        .animation(nil, value: scrollOffset)  // Prevent scroll from interfering with animations
     }
     
+    
+    private var contentList: some View {
+        let sections = groupedBySection()
+        
+        return VStack(alignment: .leading, spacing: 20) {
+            ForEach(sections, id: \.section) { sectionData in
+                VStack(alignment: .leading, spacing: 12) {
+                    if !sectionData.section.isEmpty {
+                        Text(sectionData.section)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                            .padding(.horizontal)
+                    }
+                    
+                    ForEach(sectionData.groups) { group in
+                        NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
+                            GroupCard(group: group, groupingMode: store.groupingMode)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal)
+                    }
+                }
+            }
+        }
+        .padding(.top, 8)
+        .padding(.bottom, 40)
+        .animation(nil, value: scrollOffset)  // Prevent scroll from causing unnecessary animations
+        .id(store.groupingMode)  // Only re-render when grouping mode changes
+    }
     
     private var groupingToggle: some View {
         HStack {
@@ -281,6 +369,15 @@ struct GroupCard: View {
         .padding()
         .background(group.color)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+// PreferenceKey for tracking scroll offset
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
