@@ -1,5 +1,36 @@
 import SwiftUI
 import UIKit
+import Photos
+import PhotosUI
+import UniformTypeIdentifiers
+
+// Temporary cache for storing original image file URLs with EXIF data
+class ImageMetadataCache {
+    static let shared = ImageMetadataCache()
+    private var fileURL: URL?
+    
+    func storeFileURL(_ url: URL) {
+        // Clean up old file if exists
+        if let oldURL = fileURL {
+            try? FileManager.default.removeItem(at: oldURL)
+        }
+        fileURL = url
+        print("📦 [MetadataCache] Stored file URL: \(url.lastPathComponent)")
+    }
+    
+    func getFileURL() -> URL? {
+        print("📦 [MetadataCache] Retrieved file URL: \(fileURL?.lastPathComponent ?? "nil")")
+        return fileURL
+    }
+    
+    func clearFileURL() {
+        if let url = fileURL {
+            try? FileManager.default.removeItem(at: url)
+            print("📦 [MetadataCache] Cleaned up file: \(url.lastPathComponent)")
+        }
+        fileURL = nil
+    }
+}
 
 enum BracketPosition {
     case topLeft, topRight, bottomLeft, bottomRight
@@ -209,20 +240,36 @@ struct ImagePicker: UIViewControllerRepresentable {
     let sourceType: UIImagePickerController.SourceType
     @Environment(\.dismiss) var dismiss
     
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.sourceType = sourceType
-        picker.delegate = context.coordinator
-        return picker
+    func makeUIViewController(context: Context) -> UIViewController {
+        // Use PHPickerViewController for photo library (modern API with better metadata support)
+        if sourceType == .photoLibrary {
+            var configuration = PHPickerConfiguration(photoLibrary: .shared())
+            configuration.filter = .images
+            configuration.selectionLimit = 1
+            configuration.preferredAssetRepresentationMode = .current  // Get the current version with edits
+            
+            print("📋 [ImagePicker] Creating PHPickerViewController with configuration")
+            
+            let picker = PHPickerViewController(configuration: configuration)
+            picker.delegate = context.coordinator
+            return picker
+        } else {
+            // Use UIImagePickerController for camera
+            print("📋 [ImagePicker] Creating UIImagePickerController for camera")
+            let picker = UIImagePickerController()
+            picker.sourceType = sourceType
+            picker.delegate = context.coordinator
+            return picker
+        }
     }
     
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
     
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate, PHPickerViewControllerDelegate {
         let parent: ImagePicker
         
         init(_ parent: ImagePicker) {
@@ -230,13 +277,200 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
         
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let image = info[.originalImage] as? UIImage {
+            print("🖼️ [ImagePicker] Image selected from library")
+            print("🖼️ [ImagePicker] Available info keys: \(info.keys.map { $0.rawValue })")
+            
+            // Try to get PHAsset for full metadata access
+            if let asset = info[.phAsset] as? PHAsset {
+                print("✅ [ImagePicker] Got PHAsset directly")
+                loadImageWithMetadata(from: asset)
+            } else if let referenceURL = info[.referenceURL] as? URL {
+                // Try to get PHAsset from reference URL
+                print("✅ [ImagePicker] Got reference URL: \(referenceURL)")
+                let fetchResult = PHAsset.fetchAssets(withALAssetURLs: [referenceURL], options: nil)
+                if let asset = fetchResult.firstObject {
+                    print("✅ [ImagePicker] Fetched PHAsset from reference URL")
+                    loadImageWithMetadata(from: asset)
+                } else {
+                    print("⚠️ [ImagePicker] Could not fetch PHAsset from reference URL")
+                    if let imageURL = info[.imageURL] as? URL {
+                        loadImageFromURL(imageURL)
+                    } else if let image = info[.originalImage] as? UIImage {
+                        parent.image = image
+                        parent.dismiss()
+                    }
+                }
+            } else if let imageURL = info[.imageURL] as? URL {
+                print("⚠️ [ImagePicker] Only got image URL (no PHAsset): \(imageURL)")
+                loadImageFromURL(imageURL)
+            } else if let image = info[.originalImage] as? UIImage {
+                print("⚠️ [ImagePicker] Only got UIImage, EXIF may be missing")
                 parent.image = image
+                parent.dismiss()
+            } else {
+                print("❌ [ImagePicker] Failed to get image")
+                parent.dismiss()
             }
-            parent.dismiss()
         }
         
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            print("❌ [ImagePicker] User cancelled")
+            parent.dismiss()
+        }
+        
+        // PHPickerViewControllerDelegate
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            print("🖼️ [PHPicker] Picker finished with \(results.count) results")
+            
+            guard let result = results.first else {
+                print("❌ [PHPicker] No results selected")
+                parent.dismiss()
+                return
+            }
+            
+            print("✅ [PHPicker] Got result with identifier: \(result.assetIdentifier ?? "nil")")
+            
+            // Load file representation to preserve EXIF data
+            print("📂 [PHPicker] Loading file representation to preserve EXIF...")
+            
+            let itemProvider = result.itemProvider
+            
+            // Check if we can load as an image
+            if itemProvider.canLoadObject(ofClass: UIImage.self) {
+                // Load the file representation (this preserves EXIF data)
+                itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { [weak self] url, error in
+                    guard let self = self else { return }
+                    
+                    if let error = error {
+                        print("❌ [PHPicker] Error loading file representation: \(error.localizedDescription)")
+                        DispatchQueue.main.async {
+                            self.parent.dismiss()
+                        }
+                        return
+                    }
+                    
+                    guard let url = url else {
+                        print("❌ [PHPicker] No URL returned from file representation")
+                        DispatchQueue.main.async {
+                            self.parent.dismiss()
+                        }
+                        return
+                    }
+                    
+                    print("✅ [PHPicker] Got file URL: \(url)")
+                    
+                    // IMPORTANT: Extract EXIF from the URL BEFORE creating UIImage
+                    // UIImage creation strips EXIF data!
+                    print("🧪 [PHPicker] Extracting EXIF from file URL BEFORE creating UIImage...")
+                    let metadataFromFile = EXIFHelper.extractBasicMetadata(from: url)
+                    print("🧪 [PHPicker] File EXIF result - Date: \(metadataFromFile.date?.description ?? "nil"), Coords: \(metadataFromFile.coordinates != nil ? "YES" : "NO")")
+                    
+                    // Copy the file to a persistent location so we can extract EXIF later
+                    let tempDirectory = FileManager.default.temporaryDirectory
+                    let destinationURL = tempDirectory.appendingPathComponent("original_\(UUID().uuidString).\(url.pathExtension)")
+                    
+                    do {
+                        // Copy the file
+                        try FileManager.default.copyItem(at: url, to: destinationURL)
+                        print("✅ [PHPicker] Copied file to: \(destinationURL)")
+                        
+                        // Store the URL for later EXIF extraction
+                        ImageMetadataCache.shared.storeFileURL(destinationURL)
+                        
+                        // Load image data
+                        let imageData = try Data(contentsOf: url)
+                        print("✅ [PHPicker] Loaded image data: \(imageData.count) bytes")
+                        
+                        if let image = UIImage(data: imageData) {
+                            print("✅ [PHPicker] Created UIImage, size: \(image.size)")
+                            
+                            DispatchQueue.main.async {
+                                self.parent.image = image
+                                self.parent.dismiss()
+                            }
+                        } else {
+                            print("❌ [PHPicker] Failed to create UIImage from data")
+                            DispatchQueue.main.async {
+                                self.parent.dismiss()
+                            }
+                        }
+                    } catch {
+                        print("❌ [PHPicker] Error: \(error.localizedDescription)")
+                        DispatchQueue.main.async {
+                            self.parent.dismiss()
+                        }
+                    }
+                }
+            } else {
+                print("❌ [PHPicker] Cannot load as image")
+                parent.dismiss()
+            }
+        }
+        
+        private func loadImageWithMetadata(from asset: PHAsset) {
+            let options = PHImageRequestOptions()
+            options.version = .current
+            options.deliveryMode = .highQualityFormat
+            options.isNetworkAccessAllowed = true
+            options.isSynchronous = false
+            
+            PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { [weak self] imageData, dataUTI, orientation, info in
+                guard let self = self else { return }
+                
+                if let imageData = imageData {
+                    print("✅ [ImagePicker] Got image data from PHAsset: \(imageData.count) bytes")
+                    
+                    if let image = UIImage(data: imageData) {
+                        print("✅ [ImagePicker] Created UIImage from PHAsset data")
+                        print("✅ [ImagePicker] Image size: \(image.size), orientation: \(orientation.rawValue)")
+                        
+                        // Test EXIF extraction immediately
+                        print("🧪 [ImagePicker] Testing EXIF extraction on PHAsset image...")
+                        let testMetadata = EXIFHelper.extractBasicMetadata(from: image)
+                        print("🧪 [ImagePicker] Test result - Date: \(testMetadata.date?.description ?? "nil"), Coords: \(testMetadata.coordinates != nil ? "YES" : "NO")")
+                        
+                        DispatchQueue.main.async {
+                            self.parent.image = image
+                            self.parent.dismiss()
+                        }
+                    } else {
+                        print("❌ [ImagePicker] Failed to create UIImage from data")
+                        DispatchQueue.main.async {
+                            self.parent.dismiss()
+                        }
+                    }
+                } else {
+                    print("❌ [ImagePicker] Failed to get image data from PHAsset")
+                    if let error = info?[PHImageErrorKey] as? Error {
+                        print("❌ [ImagePicker] Error: \(error.localizedDescription)")
+                    }
+                    DispatchQueue.main.async {
+                        self.parent.dismiss()
+                    }
+                }
+            }
+        }
+        
+        private func loadImageFromURL(_ url: URL) {
+            do {
+                let imageData = try Data(contentsOf: url)
+                print("✅ [ImagePicker] Loaded image data from URL: \(imageData.count) bytes")
+                
+                if let image = UIImage(data: imageData) {
+                    print("✅ [ImagePicker] Created UIImage from URL data")
+                    
+                    // Test EXIF extraction immediately
+                    print("🧪 [ImagePicker] Testing EXIF extraction on loaded image...")
+                    let testMetadata = EXIFHelper.extractBasicMetadata(from: image)
+                    print("🧪 [ImagePicker] Test result - Date: \(testMetadata.date?.description ?? "nil"), Coords: \(testMetadata.coordinates != nil ? "YES" : "NO")")
+                    
+                    parent.image = image
+                } else {
+                    print("❌ [ImagePicker] Failed to create UIImage from URL data")
+                }
+            } catch {
+                print("❌ [ImagePicker] Error loading from URL: \(error.localizedDescription)")
+            }
             parent.dismiss()
         }
     }

@@ -494,7 +494,12 @@ struct SegmentationView: View {
         .fullScreenCover(isPresented: $showingAddView) {
             if let image = segmentedImage {
                 let squareImage = ImageOutlineHelper.padToSquare(image: image) ?? image
-                AddMagnetView(image: squareImage)
+                AddMagnetView(image: squareImage, originalImage: originalImage)
+                    .onAppear {
+                        print("🎨 [SegmentationView] Opening AddMagnetView")
+                        print("🎨 [SegmentationView] Segmented image size: \(image.size)")
+                        print("🎨 [SegmentationView] Original image size: \(originalImage.size)")
+                    }
             }
         }
         .fullScreenCover(isPresented: $showingCropView) {

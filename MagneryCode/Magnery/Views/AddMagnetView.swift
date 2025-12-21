@@ -6,9 +6,11 @@ struct AddMagnetView: View {
     @EnvironmentObject var store: MagnetStore
     
     let image: UIImage
+    let originalImage: UIImage?  // Original image with EXIF data
     @State private var name: String = ""
     @State private var location: String = "未知位置"
     @State private var notes: String = ""
+    @State private var captureDate: Date = Date()
     @State private var isGettingLocation = false
     @State private var isGeneratingNotes = false
     @State private var showingInputDialog = false
@@ -20,6 +22,11 @@ struct AddMagnetView: View {
     enum Field {
         case name
         case notes
+    }
+    
+    init(image: UIImage, originalImage: UIImage? = nil) {
+        self.image = image
+        self.originalImage = originalImage
     }
     
     var body: some View {
@@ -392,13 +399,117 @@ struct AddMagnetView: View {
                 }
             }
             .navigationBarBackButtonHidden(true)
+            .onAppear {
+                print("👁️ [AddMagnetView] View appeared")
+                print("👁️ [AddMagnetView] Has original image: \(originalImage != nil)")
+                extractEXIFData()
+            }
         }
     }
     
     private var dateString: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "M月 d日"
-        return formatter.string(from: Date())
+        return formatter.string(from: captureDate)
+    }
+    
+    private func extractEXIFData() {
+        print("🔍 [AddMagnetView] Starting EXIF extraction...")
+        
+        // First, try to get EXIF from the cached file URL
+        if let fileURL = ImageMetadataCache.shared.getFileURL() {
+            print("✅ [AddMagnetView] Found cached file URL: \(fileURL.lastPathComponent)")
+            let metadata = EXIFHelper.extractBasicMetadata(from: fileURL)
+            
+            // Set date from EXIF if available
+            if let exifDate = metadata.date {
+                print("✅ [AddMagnetView] Setting capture date from file EXIF: \(exifDate)")
+                captureDate = exifDate
+            } else {
+                print("⚠️ [AddMagnetView] No EXIF date found in file")
+            }
+            
+            // Extract location from GPS coordinates
+            if let coordinates = metadata.coordinates {
+                reverseGeocodeCoordinates(coordinates)
+            } else {
+                print("⚠️ [AddMagnetView] No GPS coordinates found in file EXIF")
+            }
+            
+            // Clean up the cached file
+            ImageMetadataCache.shared.clearFileURL()
+            return
+        }
+        
+        // Fallback: try to extract from UIImage (less reliable)
+        guard let original = originalImage else {
+            print("❌ [AddMagnetView] No original image or file URL available")
+            return
+        }
+        
+        print("⚠️ [AddMagnetView] No cached file, trying to extract from UIImage...")
+        print("✅ [AddMagnetView] Original image available, size: \(original.size)")
+        
+        let metadata = EXIFHelper.extractBasicMetadata(from: original)
+        
+        // Set date from EXIF if available
+        if let exifDate = metadata.date {
+            print("✅ [AddMagnetView] Setting capture date from EXIF: \(exifDate)")
+            captureDate = exifDate
+        } else {
+            print("⚠️ [AddMagnetView] No EXIF date found, using current date")
+        }
+        
+        // Extract location from GPS coordinates
+        if let coordinates = metadata.coordinates {
+            reverseGeocodeCoordinates(coordinates)
+        } else {
+            print("⚠️ [AddMagnetView] No GPS coordinates found in EXIF")
+        }
+    }
+    
+    private func reverseGeocodeCoordinates(_ coordinates: CLLocationCoordinate2D) {
+        print("✅ [AddMagnetView] Starting reverse geocoding for coordinates: \(coordinates.latitude), \(coordinates.longitude)")
+        isGettingLocation = true
+        let location = CLLocation(latitude: coordinates.latitude, longitude: coordinates.longitude)
+        
+        let geocoder = CLGeocoder()
+        geocoder.reverseGeocodeLocation(location) { [self] placemarks, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [AddMagnetView] Geocoding error: \(error.localizedDescription)")
+                    self.isGettingLocation = false
+                    return
+                }
+                
+                if let placemark = placemarks?.first {
+                    print("✅ [AddMagnetView] Received placemark:")
+                    print("   Country: \(placemark.country ?? "nil")")
+                    print("   Administrative Area: \(placemark.administrativeArea ?? "nil")")
+                    print("   Locality: \(placemark.locality ?? "nil")")
+                    print("   SubLocality: \(placemark.subLocality ?? "nil")")
+                    
+                    var locationComponents: [String] = []
+                    
+                    if let locality = placemark.locality {
+                        locationComponents.append(locality)
+                    }
+                    if let subLocality = placemark.subLocality {
+                        locationComponents.append(subLocality)
+                    }
+                    
+                    if !locationComponents.isEmpty {
+                        self.location = locationComponents.joined(separator: "")
+                        print("✅ [AddMagnetView] Set location to: \(self.location)")
+                    } else {
+                        print("⚠️ [AddMagnetView] No locality/subLocality found in placemark")
+                    }
+                } else {
+                    print("⚠️ [AddMagnetView] No placemarks received")
+                }
+                self.isGettingLocation = false
+            }
+        }
     }
     
     private func processImage() {
@@ -414,7 +525,7 @@ struct AddMagnetView: View {
         
         let magnet = MagnetItem(
             name: name,
-            date: Date(),
+            date: captureDate,  // Use EXIF date if available
             location: location,
             imagePath: imagePath,
             notes: notes
