@@ -12,6 +12,9 @@ struct AddMagnetView: View {
     @State private var isGettingLocation = false
     @State private var isGeneratingNotes = false
     @State private var showingInputDialog = false
+    @State private var currentEditingField: Field = .name
+    @State private var keyboardHeight: CGFloat = 0
+    @State private var dialogHeight: CGFloat = 0
     @FocusState private var focusedField: Field?
     
     enum Field {
@@ -25,6 +28,12 @@ struct AddMagnetView: View {
                 // Background with Dotted Pattern (matching reference)
                 DottedBackgroundView()
                     .ignoresSafeArea()
+                    .onAppear {
+                        setupKeyboardObservers()
+                    }
+                    .onDisappear {
+                        removeKeyboardObservers()
+                    }
                 
                 VStack(spacing: 0) {
                     // Top Bar
@@ -72,10 +81,11 @@ struct AddMagnetView: View {
                     VStack(spacing: 12) {
                         // Name Trigger
                         Button(action: {
+                            print("🔵 点击名称按钮 - 设置字段为 .name")
+                            currentEditingField = .name
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                 showingInputDialog = true
                             }
-                            // Small delay to ensure the view is rendered before focusing
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 focusedField = .name
                             }
@@ -97,10 +107,11 @@ struct AddMagnetView: View {
                         
                         // Notes Trigger
                         Button(action: {
+                            print("🟠 点击备注按钮 - 设置字段为 .notes")
+                            currentEditingField = .notes
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                 showingInputDialog = true
                             }
-                            // Small delay to ensure the view is rendered before focusing
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 focusedField = .notes
                             }
@@ -190,67 +201,75 @@ struct AddMagnetView: View {
                 
                 // Centered Input Dialog (Conditional)
                 if showingInputDialog {
-                    Color.black.opacity(0.15)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            withAnimation {
-                                showingInputDialog = false
-                                focusedField = nil
+                    GeometryReader { geometry in
+                        Color.black.opacity(0.15)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                withAnimation {
+                                    showingInputDialog = false
+                                    focusedField = nil
+                                }
                             }
-                        }
-                    
-                    VStack(spacing: 0) {
+                        
                         VStack(spacing: 24) {
-                            Text(focusedField == .name ? "输入对象名称" : "添加描述")
+                            Text(currentEditingField == .name ? "输入对象名称" : "添加描述")
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(.black)
+                                .onAppear {
+                                    print("📝 对话框显示 - currentEditingField: \(currentEditingField)")
+                                    print("📝 显示标题: \(currentEditingField == .name ? "输入对象名称" : "添加描述")")
+                                }
                             
                             ZStack(alignment: .trailing) {
-                                if focusedField == .name {
-                                    TextField("玩偶", text: $name)
-                                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                                        .multilineTextAlignment(.center)
-                                        .focused($focusedField, equals: .name)
-                                        .submitLabel(.done)
-                                        .lineLimit(1)
-                                        .textInputAutocapitalization(.words)
-                                        .autocorrectionDisabled(true)
-                                        .onSubmit {
-                                            withAnimation {
-                                                showingInputDialog = false
-                                                focusedField = nil
-                                            }
-                                        }
-                                } else {
-                                    HStack(alignment: .center, spacing: 12) {
-                                        TextField("添加描述 (可选)", text: $notes, axis: .vertical)
-                                            .font(.system(size: 20, weight: .medium, design: .rounded))
+                                Group {
+                                    if currentEditingField == .name {
+                                        TextField("玩偶", text: $name)
+                                            .font(.system(size: 32, weight: .bold, design: .rounded))
                                             .multilineTextAlignment(.center)
-                                            .lineLimit(2)
-                                            .frame(minHeight: 50)
-                                            .focused($focusedField, equals: .notes)
-                                            .textInputAutocapitalization(.sentences)
+                                            .focused($focusedField, equals: .name)
+                                            .submitLabel(.done)
+                                            .lineLimit(1)
+                                            .textInputAutocapitalization(.words)
                                             .autocorrectionDisabled(true)
-                                        
-                                        if !name.isEmpty {
-                                            Button(action: {
-                                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                                impact.impactOccurred()
-                                                generateNotes()
-                                            }) {
-                                                ZStack {
-                                                    if isGeneratingNotes {
-                                                        ProgressView()
-                                                            .scaleEffect(0.7)
-                                                            .tint(.orange)
-                                                    } else {
-                                                        Image(systemName: "sparkles")
-                                                            .font(.system(size: 16, weight: .semibold))
-                                                            .foregroundColor(.orange)
-                                                    }
+                                            .onSubmit {
+                                                withAnimation {
+                                                    showingInputDialog = false
+                                                    focusedField = nil
                                                 }
-                                                .frame(width: 36, height: 36)
-                                                .background(Circle().fill(Color.orange.opacity(0.1)))
+                                            }
+                                            .id("nameField")
+                                    } else if currentEditingField == .notes {
+                                        HStack(alignment: .center, spacing: 12) {
+                                            TextField("添加描述 (可选)", text: $notes, axis: .vertical)
+                                                .font(.system(size: 20, weight: .medium, design: .rounded))
+                                                .multilineTextAlignment(.center)
+                                                .lineLimit(1...2)
+                                                .frame(minHeight: 50)
+                                                .focused($focusedField, equals: .notes)
+                                                .textInputAutocapitalization(.sentences)
+                                                .autocorrectionDisabled(true)
+                                                .id("notesField")
+                                        
+                                            if !name.isEmpty {
+                                                Button(action: {
+                                                    let impact = UIImpactFeedbackGenerator(style: .light)
+                                                    impact.impactOccurred()
+                                                    generateNotes()
+                                                }) {
+                                                    ZStack {
+                                                        if isGeneratingNotes {
+                                                            ProgressView()
+                                                                .scaleEffect(0.7)
+                                                                .tint(.orange)
+                                                        } else {
+                                                            Image(systemName: "sparkles")
+                                                                .font(.system(size: 16, weight: .semibold))
+                                                                .foregroundColor(.orange)
+                                                        }
+                                                    }
+                                                    .frame(width: 36, height: 36)
+                                                    .background(Circle().fill(Color.orange.opacity(0.1)))
+                                                }
                                             }
                                         }
                                     }
@@ -294,14 +313,63 @@ struct AddMagnetView: View {
                         }
                         .padding(30)
                         .background(
-                            RoundedRectangle(cornerRadius: 32)
-                                .fill(Color.white)
-                                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
+                            GeometryReader { dialogGeometry in
+                                RoundedRectangle(cornerRadius: 32)
+                                    .fill(Color.white)
+                                    .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
+                                    .onAppear {
+                                        DispatchQueue.main.async {
+                                            dialogHeight = dialogGeometry.size.height
+                                        }
+                                    }
+                                    .onChange(of: dialogGeometry.size.height) { newHeight in
+                                        dialogHeight = newHeight
+                                    }
+                            }
                         )
                         .padding(.horizontal, 40)
+                        .position(
+                            x: geometry.size.width / 2,
+                            y: {
+                                let screenHeight = geometry.size.height
+                                // 底部间距 + 阴影扩展空间
+                                let shadowRadius: CGFloat = 20
+                                let bottomMargin: CGFloat = 20 + shadowRadius
+                                
+                                // 如果对话框高度还没测量出来，先使用一个估计值
+                                let actualDialogHeight = dialogHeight > 0 ? dialogHeight : 271
+                                
+                                // 对话框底部应该在：screenHeight - bottomMargin
+                                // 对话框中心Y = 对话框底部Y - 对话框高度的一半
+                                let dialogBottomY = screenHeight - bottomMargin
+                                let dialogCenterY = dialogBottomY - (actualDialogHeight / 2)
+                                
+                                // 确保对话框顶部不会超出屏幕
+                                let minY = actualDialogHeight / 2 + 20
+                                let dialogY = max(minY, dialogCenterY)
+                                
+                                // 计算实际的对话框底部边缘
+                                let actualDialogBottom = dialogY + (actualDialogHeight / 2)
+                                
+                                print("📱 屏幕高度(可用空间): \(screenHeight)")
+                                print("⌨️ 键盘高度: \(keyboardHeight)")
+                                print("📦 对话框高度: \(actualDialogHeight) (measured: \(dialogHeight))")
+                                print("🌫️  阴影半径: \(shadowRadius)")
+                                print("📍 对话框中心Y: \(dialogY)")
+                                print("📏 对话框顶部Y: \(dialogY - actualDialogHeight/2)")
+                                print("🔽 对话框底部Y(不含阴影): \(actualDialogBottom)")
+                                print("🔽 对话框底部Y(含阴影): \(actualDialogBottom + shadowRadius)")
+                                print("🔼 键盘上边缘Y: \(screenHeight)")
+                                print("📐 对话框底部与键盘的距离(含阴影): \(screenHeight - (actualDialogBottom + shadowRadius))")
+                                print("⚠️  是否重叠: \((actualDialogBottom + shadowRadius) > screenHeight ? "是，重叠了 \((actualDialogBottom + shadowRadius) - screenHeight) 点" : "否")")
+                                print("---")
+                                
+                                return dialogY
+                            }()
+                        )
+                        .animation(.easeOut(duration: 0.25), value: keyboardHeight)
+                        .animation(.easeOut(duration: 0.25), value: dialogHeight)
                     }
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, 12) // Margin from keyboard
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),
                         removal: .opacity.combined(with: .scale(scale: 0.9))
@@ -388,6 +456,34 @@ struct AddMagnetView: View {
         } else {
             isGettingLocation = false
         }
+    }
+    
+    private func setupKeyboardObservers() {
+        NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillShowNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            withAnimation(.easeOut(duration: 0.3)) {
+                keyboardHeight = keyboardFrame.height
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillHideNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            withAnimation(.easeOut(duration: 0.3)) {
+                keyboardHeight = 0
+            }
+        }
+    }
+    
+    private func removeKeyboardObservers() {
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
     }
 }
 
