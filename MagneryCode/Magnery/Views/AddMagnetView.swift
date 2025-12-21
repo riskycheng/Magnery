@@ -11,226 +11,180 @@ struct AddMagnetView: View {
     @State private var notes: String = ""
     @State private var isGettingLocation = false
     @State private var isGeneratingNotes = false
+    @State private var showingInputDialog = false
+    @FocusState private var focusedField: Field?
+    
+    enum Field {
+        case name
+        case notes
+    }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(UIColor.systemGroupedBackground)
+                // Background with Dotted Pattern (matching reference)
+                DottedBackgroundView()
                     .ignoresSafeArea()
                 
-                VStack(spacing: 20) {
+                VStack(spacing: 0) {
+                    // Top Bar
+                    HStack {
+                        Button(action: {
+                            dismiss()
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 22, weight: .medium))
+                                .foregroundColor(.gray)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    
+                    // Date Header
+                    HStack {
+                        Text(dateString)
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 10)
+                    
+                    Spacer()
+                    
+                    // Magnet Image with Glow
                     ZStack {
-                        Ellipse()
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        Color(red: 1.0, green: 0.95, blue: 0.65).opacity(0.6),
-                                        Color(red: 1.0, green: 0.92, blue: 0.7).opacity(0.4),
-                                        Color(red: 0.98, green: 0.95, blue: 0.85).opacity(0.2),
-                                        Color.clear
-                                    ],
-                                    center: .center,
-                                    startRadius: 60,
-                                    endRadius: 200
-                                )
-                            )
-                            .frame(width: 380, height: 420)
-                            .blur(radius: 35)
+                        Circle()
+                            .fill(Color.orange.opacity(0.15))
+                            .frame(width: 260, height: 260)
+                            .blur(radius: 40)
                         
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 300)
-                            .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
+                            .frame(maxHeight: 240)
+                            .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
                     }
-                    .padding(.top, 30)
+                    .padding(.bottom, 40)
                     
-                    VStack(spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white)
-                                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
-                            
-                            TextField("取个名字", text: $name)
-                                .font(.system(size: 18, weight: .medium, design: .rounded))
-                                .multilineTextAlignment(.center)
-                                .padding(.vertical, 16)
-                                .padding(.horizontal, 20)
+                    // Input Trigger (The "Input Box" that calls the dialog)
+                    Button(action: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            showingInputDialog = true
+                            focusedField = .name
                         }
-                        .frame(width: 320, height: 52)
-                        
-                        ZStack(alignment: .bottomTrailing) {
-                            ZStack(alignment: .topLeading) {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color.white)
-                                    .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
-                                
-                                TextEditor(text: $notes)
-                                    .font(.system(size: 15, design: .rounded))
-                                    .foregroundColor(.primary)
-                                    .scrollContentBackground(.hidden)
-                                    .frame(height: 110)
-                                    .padding(16)
-                                    .padding(.bottom, 44)
-                                
-                                if notes.isEmpty {
-                                    Text("添加一点描述...")
-                                        .font(.system(size: 15, design: .rounded))
-                                        .foregroundColor(.gray.opacity(0.4))
-                                        .padding(.top, 24)
-                                        .padding(.leading, 20)
-                                        .allowsHitTesting(false)
-                                }
+                    }) {
+                        HStack {
+                            Text(name.isEmpty ? "点击输入名称..." : name)
+                                .font(.system(size: 18, weight: .medium, design: .rounded))
+                                .foregroundColor(name.isEmpty ? .gray.opacity(0.5) : .primary)
+                            Spacer()
+                            Image(systemName: "pencil")
+                                .foregroundColor(.gray.opacity(0.5))
+                        }
+                        .padding(.horizontal, 20)
+                        .frame(width: 280, height: 56)
+                        .background(Color.white)
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+                    }
+                    .padding(.bottom, 20)
+                    
+                    Spacer()
+                }
+                
+                // Centered Input Dialog (Conditional)
+                if showingInputDialog {
+                    Color.black.opacity(0.15)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation {
+                                showingInputDialog = false
+                                focusedField = nil
                             }
+                        }
+                    
+                    VStack {
+                        Spacer()
+                        
+                        VStack(spacing: 24) {
+                            Text("输入对象名称")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.black)
                             
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                impact.impactOccurred()
-                                generateNotes()
-                            }) {
-                                ZStack {
-                                    if isGeneratingNotes {
-                                        ProgressView()
-                                            .scaleEffect(0.7)
-                                            .tint(.orange)
-                                    } else {
-                                        Image(systemName: "sparkles")
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundColor(.orange)
+                            VStack(spacing: 12) {
+                                TextField("玩偶", text: $name)
+                                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                                    .multilineTextAlignment(.center)
+                                    .focused($focusedField, equals: .name)
+                                    .submitLabel(.next)
+                                
+                                if focusedField == .notes || !notes.isEmpty {
+                                    TextEditor(text: $notes)
+                                        .font(.system(size: 16, design: .rounded))
+                                        .frame(height: 80)
+                                        .padding(8)
+                                        .background(Color.gray.opacity(0.05))
+                                        .cornerRadius(12)
+                                        .focused($focusedField, equals: .notes)
+                                } else {
+                                    Button(action: { focusedField = .notes }) {
+                                        Text(notes.isEmpty ? "添加描述 (可选)" : notes)
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.gray)
                                     }
                                 }
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    Circle()
-                                        .fill(Color.orange.opacity(0.1))
-                                )
                             }
-                            .disabled(name.isEmpty || isGeneratingNotes)
-                            .opacity(name.isEmpty ? 0.3 : 1.0)
-                            .padding(12)
-                        }
-                        .frame(width: 320, height: 110)
-                    }
-                    
-                    Spacer(minLength: 180)
-                }
-            
-                
-                VStack {
-                    Spacer()
-                    
-                    HStack(spacing: 44) {
-                        Button(action: {
-                            let impact = UIImpactFeedbackGenerator(style: .light)
-                            impact.impactOccurred()
-                            processImage()
-                        }) {
-                            Circle()
-                                .fill(Color.white)
-                                .frame(width: 70, height: 70)
-                                .overlay(
-                                    Circle()
-                                        .stroke(
-                                            LinearGradient(
-                                                colors: [Color.orange.opacity(0.6), Color.orange.opacity(0.3)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            ),
-                                            lineWidth: 2.5
-                                        )
-                                )
-                                .overlay(
-                                    Image(systemName: "arrow.clockwise")
-                                        .font(.system(size: 24, weight: .semibold))
-                                        .foregroundColor(Color.orange.opacity(0.9))
-                                )
-                                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
-                        }
-                        
-                        Button(action: {
-                            let impact = UIImpactFeedbackGenerator(style: .medium)
-                            impact.impactOccurred()
-                            saveMagnet()
-                        }) {
-                            ZStack {
-                                if name.isEmpty {
-                                    Circle()
-                                        .fill(Color.gray.opacity(0.25))
-                                        .frame(width: 82, height: 82)
-                                } else {
-                                    Circle()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color(red: 0.3, green: 0.8, blue: 0.5), Color(red: 0.2, green: 0.7, blue: 0.4)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                        )
-                                        .frame(width: 82, height: 82)
+                            
+                            VStack(spacing: 16) {
+                                Button(action: {
+                                    saveMagnet()
+                                }) {
+                                    Text("保存")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 56)
+                                        .background(name.isEmpty ? Color.gray : Color.gray.opacity(0.8))
+                                        .cornerRadius(28)
                                 }
+                                .disabled(name.isEmpty)
                                 
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 30, weight: .bold))
-                                    .foregroundColor(.white)
+                                Button(action: {
+                                    withAnimation {
+                                        showingInputDialog = false
+                                        focusedField = nil
+                                    }
+                                }) {
+                                    Text("取消")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.gray)
+                                }
                             }
-                            .shadow(color: name.isEmpty ? .clear : Color(red: 0.2, green: 0.7, blue: 0.4).opacity(0.35), radius: 14, x: 0, y: 6)
                         }
-                        .disabled(name.isEmpty)
-                        
-                        Button(action: {
-                            let impact = UIImpactFeedbackGenerator(style: .light)
-                            impact.impactOccurred()
-                            dismiss()
-                        }) {
-                            Circle()
+                        .padding(30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 32)
                                 .fill(Color.white)
-                                .frame(width: 70, height: 70)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.gray.opacity(0.25), lineWidth: 2.5)
-                                )
-                                .overlay(
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 24, weight: .semibold))
-                                        .foregroundColor(Color.gray.opacity(0.7))
-                                )
-                                .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
+                                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
+                        )
+                        .padding(.horizontal, 40)
+                        
+                        if focusedField == nil {
+                            Spacer()
+                        } else {
+                            // This small frame ensures the dialog sits right above the keyboard
+                            Color.clear.frame(height: 10)
                         }
                     }
-                    .padding(.top, 20)
-                    .padding(.bottom, 44)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                Color.clear,
-                                Color(UIColor.systemGroupedBackground).opacity(0.85),
-                                Color(UIColor.systemGroupedBackground)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 220)
-                        .ignoresSafeArea()
-                    )
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.9).combined(with: .opacity),
+                        removal: .scale(scale: 0.9).combined(with: .opacity)
+                    ))
                 }
             }
             .navigationBarBackButtonHidden(true)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .light)
-                        impact.impactOccurred()
-                        dismiss()
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.primary)
-                    }
-                }
-            }
-            .onAppear {
-                getCurrentLocation()
-            }
         }
     }
     
