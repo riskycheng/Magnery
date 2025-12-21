@@ -120,7 +120,7 @@ struct AddMagnetView: View {
                                 Text(notes.isEmpty ? "添加描述 (可选)..." : notes)
                                     .font(.system(size: 15, design: .rounded))
                                     .foregroundColor(notes.isEmpty ? .gray.opacity(0.4) : .secondary)
-                                    .lineLimit(2)
+                                    .lineLimit(3)
                                     .multilineTextAlignment(.leading)
                                     .frame(minHeight: 40, alignment: .topLeading)
                                 Spacer()
@@ -131,7 +131,7 @@ struct AddMagnetView: View {
                             }
                             .padding(.horizontal, 20)
                             .padding(.vertical, 12)
-                            .frame(width: 280, height: 72)
+                            .frame(width: 280, height: 96)
                             .background(Color.white.opacity(0.7))
                             .cornerRadius(14)
                             .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 4)
@@ -242,12 +242,19 @@ struct AddMagnetView: View {
                                         HStack(alignment: .center, spacing: 12) {
                                             TextField("添加描述 (可选)", text: $notes, axis: .vertical)
                                                 .font(.system(size: 20, weight: .medium, design: .rounded))
-                                                .multilineTextAlignment(.center)
-                                                .lineLimit(1...2)
+                                                .multilineTextAlignment(.leading)
+                                                .lineLimit(1...3)
                                                 .frame(minHeight: 50)
                                                 .focused($focusedField, equals: .notes)
                                                 .textInputAutocapitalization(.sentences)
                                                 .autocorrectionDisabled(true)
+                                                .onChange(of: notes) { newValue in
+                                                    let lines = newValue.components(separatedBy: .newlines)
+                                                    if lines.count > 3 {
+                                                        // 只保留前三行
+                                                        notes = lines.prefix(3).joined(separator: "\n")
+                                                    }
+                                                }
                                                 .id("notesField")
                                         
                                             if !name.isEmpty {
