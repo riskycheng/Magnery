@@ -98,7 +98,33 @@ class MagnetStore: ObservableObject {
     private func loadMagnets() {
         if let data = UserDefaults.standard.data(forKey: saveKey),
            let decoded = try? JSONDecoder().decode([MagnetItem].self, from: data) {
-            magnets = decoded
+            var loadedMagnets = decoded
+            
+            // Migration: Add coordinates to existing magnets if missing
+            var updated = false
+            for i in 0..<loadedMagnets.count {
+                if loadedMagnets[i].latitude == nil {
+                    // Assign some coordinates based on location name for demo
+                    let loc = loadedMagnets[i].location
+                    if loc.contains("上海") {
+                        loadedMagnets[i].latitude = 31.2304 + Double.random(in: -0.05...0.05)
+                        loadedMagnets[i].longitude = 121.4737 + Double.random(in: -0.05...0.05)
+                    } else if loc.contains("威海") {
+                        loadedMagnets[i].latitude = 37.5097 + Double.random(in: -0.05...0.05)
+                        loadedMagnets[i].longitude = 122.1157 + Double.random(in: -0.05...0.05)
+                    } else if loc != "未知位置" {
+                        // Default to somewhere in China if we have a location name
+                        loadedMagnets[i].latitude = 35.0 + Double.random(in: -5...5)
+                        loadedMagnets[i].longitude = 105.0 + Double.random(in: -10...10)
+                    }
+                    updated = true
+                }
+            }
+            
+            self.magnets = loadedMagnets
+            if updated {
+                saveMagnets()
+            }
         }
     }
 }

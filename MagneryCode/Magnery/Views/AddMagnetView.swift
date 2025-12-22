@@ -9,6 +9,8 @@ struct AddMagnetView: View {
     let originalImage: UIImage?  // Original image with EXIF data
     @State private var name: String = ""
     @State private var location: String = "未知位置"
+    @State private var latitude: Double?
+    @State private var longitude: Double?
     @State private var notes: String = ""
     @State private var captureDate: Date = Date()
     @State private var isGettingLocation = false
@@ -470,6 +472,8 @@ struct AddMagnetView: View {
     
     private func reverseGeocodeCoordinates(_ coordinates: CLLocationCoordinate2D) {
         print("✅ [AddMagnetView] Starting reverse geocoding for coordinates: \(coordinates.latitude), \(coordinates.longitude)")
+        self.latitude = coordinates.latitude
+        self.longitude = coordinates.longitude
         isGettingLocation = true
         let location = CLLocation(latitude: coordinates.latitude, longitude: coordinates.longitude)
         
@@ -527,6 +531,8 @@ struct AddMagnetView: View {
             name: name,
             date: captureDate,  // Use EXIF date if available
             location: location,
+            latitude: latitude,
+            longitude: longitude,
             imagePath: imagePath,
             notes: notes
         )
@@ -568,6 +574,8 @@ struct AddMagnetView: View {
         locationManager.requestWhenInUseAuthorization()
         
         if let currentLocation = locationManager.location {
+            self.latitude = currentLocation.coordinate.latitude
+            self.longitude = currentLocation.coordinate.longitude
             let geocoder = CLGeocoder()
             geocoder.reverseGeocodeLocation(currentLocation) { placemarks, error in
                 if let placemark = placemarks?.first {

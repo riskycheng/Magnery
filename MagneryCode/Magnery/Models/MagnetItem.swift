@@ -6,14 +6,22 @@ struct MagnetItem: Identifiable, Codable, Equatable {
     var name: String
     var date: Date
     var location: String
+    var latitude: Double?
+    var longitude: Double?
     var imagePath: String
     var notes: String
     
-    init(id: UUID = UUID(), name: String, date: Date = Date(), location: String = "未知位置", imagePath: String, notes: String = "") {
+    var hasValidCoordinates: Bool {
+        latitude != nil && longitude != nil
+    }
+    
+    init(id: UUID = UUID(), name: String, date: Date = Date(), location: String = "未知位置", latitude: Double? = nil, longitude: Double? = nil, imagePath: String, notes: String = "") {
         self.id = id
         self.name = name
         self.date = date
         self.location = location
+        self.latitude = latitude
+        self.longitude = longitude
         self.imagePath = imagePath
         self.notes = notes
     }

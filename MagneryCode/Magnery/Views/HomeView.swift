@@ -1,5 +1,10 @@
 import SwiftUI
 
+enum HomeMode {
+    case camera
+    case map
+}
+
 struct HomeView: View {
     @EnvironmentObject var store: MagnetStore
     @State private var showingCamera = false
@@ -7,6 +12,7 @@ struct HomeView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var isCollapsed = false
     @State private var lastScrollUpdate: CGFloat = 0
+    @State private var homeMode: HomeMode = .camera
     
     private let collapsedThreshold: CGFloat = 200
     private let maxHeaderHeight: CGFloat = 320
@@ -28,8 +34,8 @@ struct HomeView: View {
                             // Expanded header content
                             expandedHeaderContent
                             
-                            // Grouping toggle
-                            groupingToggle
+                            // Mode and Grouping toggle
+                            modeAndGroupingToggle
                                 .padding(.top, 20)
                                 .padding(.bottom, 10)
                             
@@ -96,11 +102,28 @@ struct HomeView: View {
     private var expandedHeaderContent: some View {
         VStack(spacing: 20) {
             headerView
-            cameraButton
+            ZStack {
+                if homeMode == .camera {
+                    cameraButton
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    mapViewContainer
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
         }
         .frame(height: maxHeaderHeight)
         .padding(.top, 20)
         .opacity(isCollapsed ? 0 : 1)  // Simple show/hide instead of complex calculations
+    }
+    
+    private var mapViewContainer: some View {
+        MapView()
+            .frame(width: 180, height: 180)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Color.white, lineWidth: 4))
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+            .padding(.vertical, 40)
     }
     
     private var headerView: some View {
@@ -180,24 +203,46 @@ struct HomeView: View {
         .id(store.groupingMode)  // Only re-render when grouping mode changes
     }
     
-    private var groupingToggle: some View {
+    private var modeAndGroupingToggle: some View {
         HStack {
-            Spacer()
             Button(action: {
-                store.groupingMode = store.groupingMode == .location ? .time : .location
+                withAnimation(.spring()) {
+                    homeMode = homeMode == .camera ? .map : .camera
+                }
             }) {
                 HStack(spacing: 6) {
-                    Image(systemName: store.groupingMode == .location ? "mappin" : "calendar")
+                    Image(systemName: homeMode == .camera ? "map" : "camera")
                         .font(.system(size: 14))
-                    Text(store.groupingMode == .location ? "按地点" : "按日期")
+                    Text(homeMode == .camera ? "地图" : "相机")
                         .font(.subheadline)
                 }
-                .foregroundColor(.primary)
+                .foregroundColor(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Color.white)
+                .background(Color.orange)
                 .clipShape(Capsule())
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            }
+            
+            Spacer()
+            
+            if homeMode == .camera {
+                Button(action: {
+                    store.groupingMode = store.groupingMode == .location ? .time : .location
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: store.groupingMode == .location ? "mappin" : "calendar")
+                            .font(.system(size: 14))
+                        Text(store.groupingMode == .location ? "按地点" : "按日期")
+                            .font(.subheadline)
+                    }
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                }
             }
         }
         .padding(.horizontal)
