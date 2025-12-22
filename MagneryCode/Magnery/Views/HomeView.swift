@@ -121,8 +121,13 @@ struct HomeView: View {
         MapView()
             .frame(maxWidth: .infinity)
             .frame(height: 220)
-            .background(Color.white)
-            .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.white, lineWidth: 2)
+            )
+            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+            .padding(.horizontal, 20)
             .padding(.vertical, 20)
     }
     

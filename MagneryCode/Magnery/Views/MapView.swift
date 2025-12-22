@@ -5,6 +5,7 @@ struct MapView: View {
     @EnvironmentObject var store: MagnetStore
     @State private var region: MKCoordinateRegion
     @State private var selectedLocation: LocationCluster?
+    @State private var showingGlobe = false
     
     init() {
         // Default to China region
@@ -33,6 +34,27 @@ struct MapView: View {
             }
             .ignoresSafeArea()
             
+            // Fullscreen button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        showingGlobe = true
+                    }) {
+                        Image(systemName: "globe.asia.australia.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                            .padding(10)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                    }
+                    .padding(.trailing, 12)
+                    .padding(.bottom, 12)
+                }
+            }
+            
             // Selected location detail card
             if let selected = selectedLocation {
                 VStack {
@@ -54,6 +76,9 @@ struct MapView: View {
         .onChange(of: store.magnets) { _ in
             updateRegion()
         }
+        .fullScreenCover(isPresented: $showingGlobe) {
+            GlobeView()
+        }
     }
     
     private var locationClusters: [LocationCluster] {
@@ -64,7 +89,7 @@ struct MapView: View {
             return magnet.location
         }
         
-        return grouped.compactMap { (location, magnets) -> LocationCluster? in
+        var clusters = grouped.compactMap { (location, magnets) -> LocationCluster? in
             guard let firstMagnet = magnets.first,
                   let lat = firstMagnet.latitude,
                   let lon = firstMagnet.longitude else {
@@ -78,6 +103,36 @@ struct MapView: View {
                 magnets: magnets
             )
         }
+        
+        // Add jitter to overlapping or very close markers
+        for i in 0..<clusters.count {
+            for j in (i + 1)..<clusters.count {
+                let coord1 = clusters[i].coordinate
+                let coord2 = clusters[j].coordinate
+                
+                let latDiff = abs(coord1.latitude - coord2.latitude)
+                let lonDiff = abs(coord1.longitude - coord2.longitude)
+                
+                // If markers are very close (approx < 500m at equator)
+                if latDiff < 0.005 && lonDiff < 0.005 {
+                    // Apply a small offset to the second marker
+                    let jitterLat = 0.003 * Double.random(in: -1...1)
+                    let jitterLon = 0.003 * Double.random(in: -1...1)
+                    
+                    clusters[j] = LocationCluster(
+                        id: clusters[j].id,
+                        location: clusters[j].location,
+                        coordinate: CLLocationCoordinate2D(
+                            latitude: coord2.latitude + jitterLat,
+                            longitude: coord2.longitude + jitterLon
+                        ),
+                        magnets: clusters[j].magnets
+                    )
+                }
+            }
+        }
+        
+        return clusters
     }
     
     private func updateRegion() {
@@ -130,22 +185,22 @@ struct LocationMarker: View {
                     Image(uiImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 60, height: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .strokeBorder(Color.white, lineWidth: 3)
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(Color.white, lineWidth: 2)
                         )
-                        .shadow(color: .black.opacity(0.25), radius: 6, x: 0, y: 3)
+                        .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                 }
                 
                 // Count badge (top-right corner)
                 if cluster.magnets.count > 1 {
                     Text("\(cluster.magnets.count)")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
                         .background(
                             Capsule()
                                 .fill(
@@ -158,20 +213,20 @@ struct LocationMarker: View {
                                         endPoint: .bottomTrailing
                                     )
                                 )
-                                .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 2)
+                                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                         )
-                        .offset(x: 8, y: -8)
+                        .offset(x: 6, y: -6)
                 }
             }
             
             // Location pin
             Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 14))
+                .font(.system(size: 10))
                 .foregroundColor(isSelected ? Color.orange : Color.white)
-                .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.3), radius: 1, x: 0, y: 1)
                 .offset(y: -2)
         }
-        .scaleEffect(isSelected ? 1.15 : 1.0)
+        .scaleEffect(isSelected ? 1.1 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
         .onTapGesture {
             onTap()
