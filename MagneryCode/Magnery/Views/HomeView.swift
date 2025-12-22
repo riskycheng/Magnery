@@ -119,11 +119,11 @@ struct HomeView: View {
     
     private var mapViewContainer: some View {
         MapView()
-            .frame(width: 180, height: 180)
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.white, lineWidth: 4))
-            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-            .padding(.vertical, 40)
+            .frame(maxWidth: .infinity)
+            .frame(height: 220)
+            .background(Color.white)
+            .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+            .padding(.vertical, 20)
     }
     
     private var headerView: some View {

@@ -18,7 +18,6 @@ struct MapView: View {
         ZStack {
             Map(coordinateRegion: $region, 
                 interactionModes: .all,
-                showsUserLocation: true,
                 annotationItems: locationClusters) { cluster in
                 MapAnnotation(coordinate: cluster.coordinate) {
                     LocationMarker(
