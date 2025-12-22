@@ -186,6 +186,7 @@ struct LocationMarker: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 44, height: 44)
+                        .background(Color.white) // Added white background
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
