@@ -15,7 +15,7 @@ struct HomeView: View {
     @State private var homeMode: HomeMode = .camera
     
     private let collapsedThreshold: CGFloat = 200
-    private let maxHeaderHeight: CGFloat = 320
+    private let maxHeaderHeight: CGFloat = 360
     private let scrollUpdateThreshold: CGFloat = 2  // Only update every 2 points for smoother animation
     
     var body: some View {
@@ -100,8 +100,13 @@ struct HomeView: View {
     
     // Expanded header content with camera button
     private var expandedHeaderContent: some View {
-        VStack(spacing: 20) {
+        let progress = min(1, max(0, 1 + (scrollOffset / collapsedThreshold)))
+        
+        return VStack(spacing: 20) {
             headerView
+                .scaleEffect(0.8 + (0.2 * progress))
+                .opacity(progress)
+            
             ZStack {
                 if homeMode == .camera {
                     cameraButton
@@ -111,10 +116,14 @@ struct HomeView: View {
                         .transition(.scale.combined(with: .opacity))
                 }
             }
+            .scaleEffect(0.6 + (0.4 * progress))
+            .opacity(progress)
         }
-        .frame(height: maxHeaderHeight)
-        .padding(.top, 20)
-        .opacity(isCollapsed ? 0 : 1)  // Simple show/hide instead of complex calculations
+        .frame(height: maxHeaderHeight * progress)
+        .padding(.top, 20 * progress)
+        .opacity(progress)
+        .blur(radius: (1 - progress) * 5)
+        .clipped()
     }
     
     private var mapViewContainer: some View {
@@ -149,9 +158,15 @@ struct HomeView: View {
                 .frame(width: 180, height: 180)
                 .rotationEffect(.degrees(ringRotation), anchor: .center)
                 .onAppear {
+                    // Reset and start animation
+                    ringRotation = 0
                     withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
                         ringRotation = 360
                     }
+                }
+                .onDisappear {
+                    // Reset rotation when it disappears to ensure it restarts correctly next time
+                    ringRotation = 0
                 }
             
             // Dots simplified for performance

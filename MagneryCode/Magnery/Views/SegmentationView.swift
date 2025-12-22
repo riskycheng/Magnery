@@ -37,6 +37,7 @@ struct SegmentationView: View {
     @State private var processingPhase: ProcessingPhase = .initial
     @State private var noObjectDetected = false
     @State private var processingText = "识别中..."
+    @State private var isAnimatingText = false
     
     enum ProcessingPhase {
         case initial
@@ -73,50 +74,100 @@ struct SegmentationView: View {
                 ZStack {
                     // Processing indicator
                     if isProcessing {
-                        VStack(spacing: 20) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.5)
+                        VStack(spacing: 25) {
+                            ZStack {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 4)
+                                    .frame(width: 60, height: 60)
+                                
+                                Circle()
+                                    .trim(from: 0, to: 0.3)
+                                    .stroke(Color.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                                    .frame(width: 60, height: 60)
+                                    .rotationEffect(.degrees(rotation))
+                                    .onAppear {
+                                        withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
+                                            rotation = 360
+                                        }
+                                    }
+                            }
                             
                             Text(processingText)
-                                .font(.headline)
+                                .font(.system(size: 20, weight: .medium, design: .rounded))
                                 .foregroundColor(.white)
-                                .shadow(radius: 2)
+                                .shadow(radius: 5)
+                                .scaleEffect(isAnimatingText ? 1.05 : 1.0)
+                                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: isAnimatingText)
+                                .onAppear {
+                                    isAnimatingText = true
+                                }
                         }
-                        .transition(.opacity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .opacity))
                         .zIndex(10)
                     }
                     
                     // No object detected message
                     if noObjectDetected {
-                        VStack(spacing: 30) {
-                            Image(systemName: "viewfinder")
-                                .font(.system(size: 60))
-                                .foregroundColor(.white)
+                        VStack(spacing: 40) {
+                            ZStack {
+                                Image(systemName: "viewfinder")
+                                    .font(.system(size: 80, weight: .ultraLight))
+                                    .foregroundColor(.white.opacity(0.6))
+                                
+                                Image(systemName: "questionmark")
+                                    .font(.system(size: 30, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .offset(y: 5)
+                            }
+                            .scaleEffect(isAnimatingText ? 1.1 : 1.0)
+                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isAnimatingText)
                             
-                            VStack(spacing: 10) {
+                            VStack(spacing: 15) {
                                 Text("未检测到明显对象")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
                                     .foregroundColor(.white)
                                 
                                 Text("将保存完整图片")
-                                    .font(.subheadline)
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                                    .foregroundColor(.white.opacity(0.7))
                             }
+                            .multilineTextAlignment(.center)
                             
-                            Button(action: {
-                                showingAddView = true
-                            }) {
-                                Text("继续")
-                                    .font(.headline)
-                                    .foregroundColor(.black)
-                                    .frame(width: 120, height: 50)
-                                    .background(Color.white)
-                                    .clipShape(Capsule())
+                            VStack(spacing: 16) {
+                                Button(action: {
+                                    showingAddView = true
+                                }) {
+                                    Text("继续")
+                                        .font(.headline)
+                                        .foregroundColor(.black)
+                                        .frame(width: 200, height: 56)
+                                        .background(Color.white)
+                                        .clipShape(Capsule())
+                                        .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                                }
+                                
+                                Button(action: {
+                                    dismiss()
+                                }) {
+                                    Text("取消")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                        .frame(width: 200, height: 56)
+                                        .background(Color.white.opacity(0.15))
+                                        .clipShape(Capsule())
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                        )
+                                }
                             }
                         }
-                        .transition(.opacity)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .opacity))
+                        .onAppear {
+                            isAnimatingText = true
+                        }
                         .zIndex(10)
                     }
                     
@@ -275,6 +326,7 @@ struct SegmentationView: View {
         isProcessing = true
         noObjectDetected = false
         processingText = "识别中..."
+        isAnimatingText = false
         backgroundBlur = 0
         showBorder = false
         segmentedImage = nil
@@ -353,17 +405,9 @@ struct SegmentationView: View {
                     // No object detected
                     print("⚠️ No foreground object detected, using original image")
                     self.segmentedImage = self.originalImage
-                    self.noObjectDetected = true
-                    self.isProcessing = false
-                    
-                    // Show "no object" message for 2 seconds, then auto-continue
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        if self.noObjectDetected {
-                            withAnimation {
-                                self.noObjectDetected = false
-                                self.showingAddView = true
-                            }
-                        }
+                    withAnimation(.spring()) {
+                        self.noObjectDetected = true
+                        self.isProcessing = false
                     }
                 }
             }
