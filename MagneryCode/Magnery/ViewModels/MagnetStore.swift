@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import CoreLocation
 
 @MainActor
 class MagnetStore: ObservableObject {
@@ -109,25 +110,17 @@ class MagnetStore: ObservableObject {
                 // If coordinates are missing OR if they were assigned to the "random China" fallback (30-40 lat, 95-115 lon)
                 // but we now have a specific city match, we should update them.
                 let isFallback = currentLat != nil && currentLat! >= 30 && currentLat! <= 40 && loadedMagnets[i].longitude! >= 95 && loadedMagnets[i].longitude! <= 115
-                let needsUpdate = currentLat == nil || (isFallback && (loc.contains("上海") || loc.contains("威海") || loc.contains("苏州")))
                 
-                if needsUpdate {
-                    if loc.contains("上海") {
-                        loadedMagnets[i].latitude = 31.2304 + Double.random(in: -0.02...0.02)
-                        loadedMagnets[i].longitude = 121.4737 + Double.random(in: -0.02...0.02)
+                if currentLat == nil || isFallback {
+                    if let coord = LocationHelper.coordinates(for: loc) {
+                        loadedMagnets[i].latitude = coord.latitude + Double.random(in: -0.02...0.02)
+                        loadedMagnets[i].longitude = coord.longitude + Double.random(in: -0.02...0.02)
                         updated = true
-                    } else if loc.contains("威海") {
-                        loadedMagnets[i].latitude = 37.5097 + Double.random(in: -0.02...0.02)
-                        loadedMagnets[i].longitude = 122.1157 + Double.random(in: -0.02...0.02)
-                        updated = true
-                    } else if loc.contains("苏州") {
-                        loadedMagnets[i].latitude = 31.2990 + Double.random(in: -0.02...0.02)
-                        loadedMagnets[i].longitude = 120.5853 + Double.random(in: -0.02...0.02)
-                        updated = true
-                    } else if currentLat == nil && loc != "未知位置" {
-                        // Only assign random China if we don't have coordinates at all
-                        loadedMagnets[i].latitude = 35.0 + Double.random(in: -5...5)
-                        loadedMagnets[i].longitude = 105.0 + Double.random(in: -10...10)
+                    } else if isFallback {
+                        // If it was a fallback but we can't find a city match, 
+                        // it's better to remove the coordinates entirely so it doesn't show in a random place
+                        loadedMagnets[i].latitude = nil
+                        loadedMagnets[i].longitude = nil
                         updated = true
                     }
                 }

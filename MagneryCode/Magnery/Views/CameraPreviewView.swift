@@ -90,6 +90,12 @@ class CameraManager: NSObject, ObservableObject {
     
     func capturePhoto() {
         let settings = AVCapturePhotoSettings()
+        
+        // Enable high quality and metadata
+        if #available(iOS 13.0, *) {
+            settings.photoQualityPrioritization = .quality
+        }
+        
         photoDelegate = PhotoCaptureDelegate { image in
             DispatchQueue.main.async {
                 self.capturedImage = image

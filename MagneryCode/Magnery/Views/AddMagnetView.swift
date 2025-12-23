@@ -466,7 +466,8 @@ struct AddMagnetView: View {
         if let coordinates = metadata.coordinates {
             reverseGeocodeCoordinates(coordinates)
         } else {
-            print("⚠️ [AddMagnetView] No GPS coordinates found in EXIF")
+            print("⚠️ [AddMagnetView] No GPS coordinates found in EXIF, trying current location...")
+            getCurrentLocation()
         }
     }
     
@@ -527,12 +528,17 @@ struct AddMagnetView: View {
             return
         }
         
+        // If location is still "未知位置" or coordinates are nil, 
+        // we ensure they are nil so they don't show up on the map
+        let finalLat = (location == "未知位置" || latitude == nil) ? nil : latitude
+        let finalLon = (location == "未知位置" || longitude == nil) ? nil : longitude
+        
         let magnet = MagnetItem(
             name: name,
             date: captureDate,  // Use EXIF date if available
             location: location,
-            latitude: latitude,
-            longitude: longitude,
+            latitude: finalLat,
+            longitude: finalLon,
             imagePath: imagePath,
             notes: notes
         )
