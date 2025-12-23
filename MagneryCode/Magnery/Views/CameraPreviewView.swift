@@ -35,6 +35,7 @@ class CameraManager: NSObject, ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     private var photoDelegate: PhotoCaptureDelegate?
     private let sessionQueue = DispatchQueue(label: "com.magnery.camera.sessionQueue")
+    private var isConfigured = false
     
     override init() {
         super.init()
@@ -52,6 +53,7 @@ class CameraManager: NSObject, ObservableObject {
                     self.isAuthorized = granted
                     if granted {
                         self.setupCamera()
+                        self.startSession()
                     }
                 }
             }
@@ -63,7 +65,13 @@ class CameraManager: NSObject, ObservableObject {
     func setupCamera() {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
+            if self.isConfigured { return }
+            
             self.session.beginConfiguration()
+            
+            // Clean up existing inputs/outputs
+            self.session.inputs.forEach { self.session.removeInput($0) }
+            self.session.outputs.forEach { self.session.removeOutput($0) }
             
             guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
                   let input = try? AVCaptureDeviceInput(device: device) else {
@@ -81,10 +89,8 @@ class CameraManager: NSObject, ObservableObject {
             }
             
             self.session.commitConfiguration()
-            
-            if self.isAuthorized {
-                self.session.startRunning()
-            }
+            self.isConfigured = true
+            print("✅ [CameraManager] Camera setup complete")
         }
     }
     
@@ -109,16 +115,27 @@ class CameraManager: NSObject, ObservableObject {
             guard let self = self else { return }
             if self.session.isRunning {
                 self.session.stopRunning()
+                print("⏹️ [CameraManager] Session stopped")
             }
         }
     }
     
     func startSession() {
-        guard isAuthorized else { return }
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
+            guard self.isAuthorized else { 
+                print("⚠️ [CameraManager] Cannot start session: Not authorized")
+                return 
+            }
+            
+            if !self.isConfigured {
+                print("⚠️ [CameraManager] Session not configured yet, skipping start")
+                return
+            }
+            
             if !self.session.isRunning {
                 self.session.startRunning()
+                print("▶️ [CameraManager] Session started")
             }
         }
     }
@@ -133,11 +150,26 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
     
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         guard error == nil,
-              let imageData = photo.fileDataRepresentation(),
-              let image = UIImage(data: imageData) else {
+              let imageData = photo.fileDataRepresentation() else {
+            print("❌ [PhotoCaptureDelegate] Error capturing photo: \(error?.localizedDescription ?? "Unknown error")")
             completion(nil)
             return
         }
-        completion(image)
+        
+        // Save to temporary file to preserve EXIF metadata
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+        do {
+            try imageData.write(to: tempURL)
+            ImageMetadataCache.shared.storeFileURL(tempURL)
+            print("✅ [PhotoCaptureDelegate] Saved photo with metadata to: \(tempURL.lastPathComponent)")
+        } catch {
+            print("❌ [PhotoCaptureDelegate] Failed to save temp file: \(error.localizedDescription)")
+        }
+        
+        if let image = UIImage(data: imageData) {
+            completion(image)
+        } else {
+            completion(nil)
+        }
     }
 }

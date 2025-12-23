@@ -420,14 +420,13 @@ struct ImagePicker: UIViewControllerRepresentable {
                 if let imageData = imageData {
                     print("✅ [ImagePicker] Got image data from PHAsset: \(imageData.count) bytes")
                     
+                    // Save to temp file to preserve EXIF
+                    let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+                    try? imageData.write(to: tempURL)
+                    ImageMetadataCache.shared.storeFileURL(tempURL)
+                    
                     if let image = UIImage(data: imageData) {
                         print("✅ [ImagePicker] Created UIImage from PHAsset data")
-                        print("✅ [ImagePicker] Image size: \(image.size), orientation: \(orientation.rawValue)")
-                        
-                        // Test EXIF extraction immediately
-                        print("🧪 [ImagePicker] Testing EXIF extraction on PHAsset image...")
-                        let testMetadata = EXIFHelper.extractBasicMetadata(from: image)
-                        print("🧪 [ImagePicker] Test result - Date: \(testMetadata.date?.description ?? "nil"), Coords: \(testMetadata.coordinates != nil ? "YES" : "NO")")
                         
                         DispatchQueue.main.async {
                             self.parent.image = image
@@ -441,9 +440,6 @@ struct ImagePicker: UIViewControllerRepresentable {
                     }
                 } else {
                     print("❌ [ImagePicker] Failed to get image data from PHAsset")
-                    if let error = info?[PHImageErrorKey] as? Error {
-                        print("❌ [ImagePicker] Error: \(error.localizedDescription)")
-                    }
                     DispatchQueue.main.async {
                         self.parent.dismiss()
                     }
@@ -456,14 +452,13 @@ struct ImagePicker: UIViewControllerRepresentable {
                 let imageData = try Data(contentsOf: url)
                 print("✅ [ImagePicker] Loaded image data from URL: \(imageData.count) bytes")
                 
+                // Save to temp file to preserve EXIF
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+                try? imageData.write(to: tempURL)
+                ImageMetadataCache.shared.storeFileURL(tempURL)
+                
                 if let image = UIImage(data: imageData) {
                     print("✅ [ImagePicker] Created UIImage from URL data")
-                    
-                    // Test EXIF extraction immediately
-                    print("🧪 [ImagePicker] Testing EXIF extraction on loaded image...")
-                    let testMetadata = EXIFHelper.extractBasicMetadata(from: image)
-                    print("🧪 [ImagePicker] Test result - Date: \(testMetadata.date?.description ?? "nil"), Coords: \(testMetadata.coordinates != nil ? "YES" : "NO")")
-                    
                     parent.image = image
                 } else {
                     print("❌ [ImagePicker] Failed to create UIImage from URL data")
