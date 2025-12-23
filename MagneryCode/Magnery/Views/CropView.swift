@@ -11,35 +11,46 @@ struct CropView: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var rotation: Double = 0
-    @State private var showingAspectRatioMenu = false
+    @State private var fineRotation: Double = 0
     @State private var selectedAspectRatio: AspectRatio = .original
-    @State private var cropArea: CGRect = .zero
     @State private var containerSize: CGSize = .zero
+    @State private var isInteracting = false
+    @State private var interactionTimer: Timer?
     
-    // Minimum scale to ensure image covers the crop area
-    private let minScale: CGFloat = 1.0
+    // Crop box state (in view coordinates)
+    @State private var cropRect: CGRect = .zero
+    
+    private let minScale: CGFloat = 0.5
     private let maxScale: CGFloat = 5.0
+    private let minCropSize: CGFloat = 50.0
     
     enum AspectRatio: String, CaseIterable {
-        case original = "原有"
-        case square = "正方形"
-        case ratio3_2 = "3:2"
-        case ratio5_3 = "5:3"
+        case original = "自由"
+        case square = "1:1"
+        case ratio3_4 = "3:4"
         case ratio4_3 = "4:3"
-        case ratio5_4 = "5:4"
-        case ratio7_5 = "7:5"
+        case ratio9_16 = "9:16"
         case ratio16_9 = "16:9"
         
         var value: CGFloat? {
             switch self {
             case .original: return nil
             case .square: return 1.0
-            case .ratio3_2: return 3.0/2.0
-            case .ratio5_3: return 5.0/3.0
+            case .ratio3_4: return 3.0/4.0
             case .ratio4_3: return 4.0/3.0
-            case .ratio5_4: return 5.0/4.0
-            case .ratio7_5: return 7.0/5.0
+            case .ratio9_16: return 9.0/16.0
             case .ratio16_9: return 16.0/9.0
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .original: return "rectangle.dashed"
+            case .square: return "square"
+            case .ratio3_4: return "rectangle.portrait"
+            case .ratio4_3: return "rectangle"
+            case .ratio9_16: return "iphone"
+            case .ratio16_9: return "tv"
             }
         }
     }
@@ -48,53 +59,60 @@ struct CropView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            VStack {
-                // Header
-                VStack(spacing: 12) {
-                    Image(systemName: "crop")
-                        .font(.system(size: 30))
-                        .foregroundColor(.white)
-                    VStack(spacing: 4) {
-                        Text("调整图片大小或位置")
-                            .font(.headline)
+            VStack(spacing: 0) {
+                // Top Bar
+                HStack {
+                    Button(action: { dismiss() }) {
+                        Text("取消")
                             .foregroundColor(.white)
-                        Text("把想识别的内容放在屏幕中间")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .font(.system(size: 17))
+                    }
+                    
+                    Spacer()
+                    
+                    Text("编辑图片")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    Button(action: cropImage) {
+                        Text("完成")
+                            .foregroundColor(.orange)
+                            .font(.system(size: 17, weight: .bold))
                     }
                 }
-                .padding(.top, 50)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 20)
                 
-                Spacer()
-                
-                // Crop Area
+                // Main Editing Area
                 GeometryReader { geometry in
                     ZStack {
                         // Image
                         Image(uiImage: originalImage)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .rotationEffect(.degrees(rotation))
+                            .rotationEffect(.degrees(rotation + fineRotation))
                             .scaleEffect(scale)
                             .offset(offset)
                             .gesture(
                                 MagnificationGesture()
                                     .onChanged { value in
+                                        startInteracting()
                                         let delta = value / lastScale
                                         lastScale = value
                                         scale *= delta
                                     }
                                     .onEnded { _ in
                                         lastScale = 1.0
-                                        withAnimation {
-                                            if scale < minScale { scale = minScale }
-                                            if scale > maxScale { scale = maxScale }
-                                        }
+                                        stopInteracting()
                                     }
                             )
                             .simultaneousGesture(
                                 DragGesture()
                                     .onChanged { value in
+                                        startInteracting()
                                         let translation = value.translation
                                         offset = CGSize(
                                             width: lastOffset.width + translation.width,
@@ -103,153 +121,171 @@ struct CropView: View {
                                     }
                                     .onEnded { _ in
                                         lastOffset = offset
+                                        stopInteracting()
                                     }
                             )
                         
                         // Crop Overlay (Mask)
                         Rectangle()
-                            .fill(Color.black.opacity(0.5))
+                            .fill(Color.black.opacity(0.6))
                             .mask(
                                 ZStack {
                                     Rectangle()
                                     Rectangle()
-                                        .frame(width: getCropSize(in: geometry.size).width,
-                                               height: getCropSize(in: geometry.size).height)
+                                        .frame(width: cropRect.width, height: cropRect.height)
+                                        .offset(x: cropRect.midX - geometry.size.width/2, y: cropRect.midY - geometry.size.height/2)
                                         .blendMode(.destinationOut)
                                 }
                             )
                             .allowsHitTesting(false)
                         
                         // Grid/Border
-                        Rectangle()
-                            .stroke(Color.white, lineWidth: 1)
-                            .frame(width: getCropSize(in: geometry.size).width,
-                                   height: getCropSize(in: geometry.size).height)
-                            .allowsHitTesting(false)
+                        ZStack {
+                            // Border
+                            Rectangle()
+                                .stroke(Color.white.opacity(0.8), lineWidth: 1)
+                            
+                            // 3x3 Grid
+                            if isInteracting {
+                                GridLines()
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
+                            }
+                        }
+                        .frame(width: cropRect.width, height: cropRect.height)
+                        .position(x: cropRect.midX, y: cropRect.midY)
+                        .allowsHitTesting(false)
                         
-                        // Corner indicators
+                        // Corner indicators (Draggable)
                         cropCorners(in: geometry.size)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
                     .onAppear {
                         containerSize = geometry.size
+                        initializeCropRect(in: geometry.size)
                     }
-                    .onChange(of: geometry.size) { newSize in
-                        containerSize = newSize
+                    .onChange(of: selectedAspectRatio) { _ in
+                        initializeCropRect(in: geometry.size)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 20)
+                .clipped()
                 
-                Spacer()
-                
-                // Action Buttons & Toolbar Area
-                VStack(spacing: 20) {
-                    // Confirm/Cancel Buttons
-                    VStack(spacing: 16) {
-                        Button(action: cropImage) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark")
-                                    .font(.headline)
-                                Text("确认选择")
-                                    .font(.headline)
-                            }
-                            .foregroundColor(Color(red: 0.4, green: 0.3, blue: 0.9))
-                            .frame(width: 160, height: 44)
-                            .background(Color.white)
-                            .clipShape(Capsule())
+                // Bottom Controls
+                VStack(spacing: 24) {
+                    // Fine Rotation Slider
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(systemName: "rotate.left")
+                                .font(.system(size: 14))
+                                .foregroundColor(.gray)
+                            
+                            Slider(value: $fineRotation, in: -45...45)
+                                .accentColor(.orange)
+                                .onChange(of: fineRotation) { _ in
+                                    startInteracting()
+                                    // Use a short timer to stop interacting after slider stops
+                                    interactionTimer?.invalidate()
+                                    interactionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
+                                        stopInteracting()
+                                    }
+                                }
+                            
+                            Image(systemName: "rotate.right")
+                                .font(.system(size: 14))
+                                .foregroundColor(.gray)
                         }
+                        .padding(.horizontal, 40)
                         
-                        Button("取消") {
-                            dismiss()
-                        }
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
+                        Text("\(Int(fineRotation))°")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundColor(.orange)
                     }
-                    .padding(.bottom, 10)
+                    .padding(.top, 20)
+                    
+                    // Aspect Ratio Selector
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 25) {
+                            ForEach(AspectRatio.allCases, id: \.self) { ratio in
+                                Button(action: {
+                                    let impact = UIImpactFeedbackGenerator(style: .light)
+                                    impact.impactOccurred()
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        selectedAspectRatio = ratio
+                                    }
+                                }) {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: ratio.icon)
+                                            .font(.system(size: 20))
+                                        Text(ratio.rawValue)
+                                            .font(.system(size: 11, weight: .medium))
+                                    }
+                                    .foregroundColor(selectedAspectRatio == ratio ? .orange : .white)
+                                    .frame(width: 50)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 30)
+                    }
                     
                     // Toolbar
-                    HStack(spacing: 0) {
-                        // Rotate Left
-                        Button(action: { rotate(-90) }) {
-                            VStack {
-                                Image(systemName: "rotate.left")
-                                    .font(.title2)
-                            }
-                            .frame(maxWidth: .infinity)
+                    HStack {
+                        Button(action: { 
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            rotate(-90) 
+                        }) {
+                            Image(systemName: "rotate.left.fill")
+                                .font(.title2)
                         }
+                        .frame(maxWidth: .infinity)
                         
-                        // Reset
-                        Button(action: reset) {
-                            VStack {
-                                Image(systemName: "arrow.counterclockwise")
-                                    .font(.title2)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        
-                        // Aspect Ratio
-                        Button(action: { withAnimation { showingAspectRatioMenu.toggle() } }) {
-                            VStack {
-                                Image(systemName: "aspectratio")
-                                    .font(.title2)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        
-                        // Rotate Right
-                        Button(action: { rotate(90) }) {
-                            VStack {
-                                Image(systemName: "rotate.right")
-                                    .font(.title2)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .foregroundColor(.white)
-                    .padding(.bottom, 20)
-                }
-            }
-            
-            // Custom Aspect Ratio Menu Overlay
-            if showingAspectRatioMenu {
-                Color.black.opacity(0.01) // Transparent catch-all for taps
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation { showingAspectRatioMenu = false }
-                    }
-                
-                VStack(spacing: 1) {
-                    ForEach(AspectRatio.allCases, id: \.self) { ratio in
                         Button(action: {
-                            selectedAspectRatio = ratio
-                            withAnimation { showingAspectRatioMenu = false }
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
                             reset()
                         }) {
-                            Text(ratio.rawValue)
-                                .font(.system(size: 16))
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(selectedAspectRatio == ratio ? Color.gray.opacity(0.2) : Color.white.opacity(0.9))
+                            Text("重置")
+                                .font(.system(size: 14, weight: .bold))
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(Capsule())
                         }
+                        .frame(maxWidth: .infinity)
+                        
+                        Button(action: { 
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            rotate(90) 
+                        }) {
+                            Image(systemName: "rotate.right.fill")
+                                .font(.title2)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
+                    .foregroundColor(.white)
+                    .padding(.bottom, 30)
                 }
-                .frame(width: 140)
-                .background(Color.white.opacity(0.9))
-                .cornerRadius(16)
-                .shadow(radius: 10)
-                .padding(.bottom, 100)
-                .position(x: UIScreen.main.bounds.width / 2 + 20, y: UIScreen.main.bounds.height - 180)
-                .transition(.scale(scale: 0.8, anchor: .bottom).combined(with: .opacity))
-                .zIndex(100)
+                .background(Color.black)
             }
         }
     }
     
-    private func getCropSize(in size: CGSize) -> CGSize {
-        let padding: CGFloat = 20
+    private func startInteracting() {
+        if !isInteracting {
+            withAnimation(.easeIn(duration: 0.2)) {
+                isInteracting = true
+            }
+        }
+    }
+    
+    private func stopInteracting() {
+        withAnimation(.easeOut(duration: 0.3)) {
+            isInteracting = false
+        }
+    }
+    
+    private func initializeCropRect(in size: CGSize) {
+        let padding: CGFloat = 40
         let availableWidth = size.width - (padding * 2)
         let availableHeight = size.height - (padding * 2)
         
@@ -257,9 +293,7 @@ struct CropView: View {
         if let ratio = selectedAspectRatio.value {
             targetRatio = ratio
         } else {
-            // Original ratio
             targetRatio = originalImage.size.width / originalImage.size.height
-            // Adjust for rotation
             if Int(abs(rotation)) % 180 == 90 {
                 targetRatio = 1.0 / targetRatio
             }
@@ -273,100 +307,211 @@ struct CropView: View {
             width = height * targetRatio
         }
         
-        return CGSize(width: width, height: height)
+        cropRect = CGRect(
+            x: (size.width - width) / 2,
+            y: (size.height - height) / 2,
+            width: width,
+            height: height
+        )
     }
     
     private func cropCorners(in size: CGSize) -> some View {
-        let cropSize = getCropSize(in: size)
-        let length: CGFloat = 20
-        let thickness: CGFloat = 4
+        let length: CGFloat = 24
+        let thickness: CGFloat = 3
+        let handleSize: CGFloat = 44 // Larger touch area
         
         return ZStack {
             // Top Left
-            VStack(alignment: .leading, spacing: 0) {
-                Rectangle().frame(width: length, height: thickness)
-                Rectangle().frame(width: thickness, height: length)
+            cornerHandle(position: .topLeft, size: handleSize) {
+                let drag = $0
+                let newX = max(0, min(cropRect.maxX - minCropSize, cropRect.origin.x + drag.width))
+                let newY = max(0, min(cropRect.maxY - minCropSize, cropRect.origin.y + drag.height))
+                
+                if let ratio = selectedAspectRatio.value {
+                    // Maintain aspect ratio
+                    let newWidth = cropRect.maxX - newX
+                    let newHeight = newWidth / ratio
+                    cropRect = CGRect(x: cropRect.maxX - newWidth, y: cropRect.maxY - newHeight, width: newWidth, height: newHeight)
+                } else {
+                    cropRect = CGRect(x: newX, y: newY, width: cropRect.maxX - newX, height: cropRect.maxY - newY)
+                }
             }
-            .offset(x: -cropSize.width/2 + length/2 - thickness/2, y: -cropSize.height/2 + length/2 - thickness/2)
+            .position(x: cropRect.minX, y: cropRect.minY)
             
             // Top Right
-            VStack(alignment: .trailing, spacing: 0) {
-                Rectangle().frame(width: length, height: thickness)
-                Rectangle().frame(width: thickness, height: length)
+            cornerHandle(position: .topRight, size: handleSize) {
+                let drag = $0
+                let newMaxX = min(size.width, max(cropRect.minX + minCropSize, cropRect.maxX + drag.width))
+                let newY = max(0, min(cropRect.maxY - minCropSize, cropRect.origin.y + drag.height))
+                
+                if let ratio = selectedAspectRatio.value {
+                    let newWidth = newMaxX - cropRect.minX
+                    let newHeight = newWidth / ratio
+                    cropRect = CGRect(x: cropRect.minX, y: cropRect.maxY - newHeight, width: newWidth, height: newHeight)
+                } else {
+                    cropRect = CGRect(x: cropRect.minX, y: newY, width: newMaxX - cropRect.minX, height: cropRect.maxY - newY)
+                }
             }
-            .offset(x: cropSize.width/2 - length/2 + thickness/2, y: -cropSize.height/2 + length/2 - thickness/2)
+            .position(x: cropRect.maxX, y: cropRect.minY)
             
             // Bottom Left
-            VStack(alignment: .leading, spacing: 0) {
-                Rectangle().frame(width: thickness, height: length)
-                Rectangle().frame(width: length, height: thickness)
+            cornerHandle(position: .bottomLeft, size: handleSize) {
+                let drag = $0
+                let newX = max(0, min(cropRect.maxX - minCropSize, cropRect.origin.x + drag.width))
+                let newMaxY = min(size.height, max(cropRect.minY + minCropSize, cropRect.maxY + drag.height))
+                
+                if let ratio = selectedAspectRatio.value {
+                    let newWidth = cropRect.maxX - newX
+                    let newHeight = newWidth / ratio
+                    cropRect = CGRect(x: cropRect.maxX - newWidth, y: cropRect.minY, width: newWidth, height: newHeight)
+                } else {
+                    cropRect = CGRect(x: newX, y: cropRect.minY, width: cropRect.maxX - newX, height: newMaxY - cropRect.minY)
+                }
             }
-            .offset(x: -cropSize.width/2 + length/2 - thickness/2, y: cropSize.height/2 - length/2 + thickness/2)
+            .position(x: cropRect.minX, y: cropRect.maxY)
             
             // Bottom Right
-            VStack(alignment: .trailing, spacing: 0) {
-                Rectangle().frame(width: thickness, height: length)
-                Rectangle().frame(width: length, height: thickness)
+            cornerHandle(position: .bottomRight, size: handleSize) {
+                let drag = $0
+                let newMaxX = min(size.width, max(cropRect.minX + minCropSize, cropRect.maxX + drag.width))
+                let newMaxY = min(size.height, max(cropRect.minY + minCropSize, cropRect.maxY + drag.height))
+                
+                if let ratio = selectedAspectRatio.value {
+                    let newWidth = newMaxX - cropRect.minX
+                    let newHeight = newWidth / ratio
+                    cropRect = CGRect(x: cropRect.minX, y: cropRect.minY, width: newWidth, height: newHeight)
+                } else {
+                    cropRect = CGRect(x: cropRect.minX, y: cropRect.minY, width: newMaxX - cropRect.minX, height: newMaxY - cropRect.minY)
+                }
             }
-            .offset(x: cropSize.width/2 - length/2 + thickness/2, y: cropSize.height/2 - length/2 + thickness/2)
+            .position(x: cropRect.maxX, y: cropRect.maxY)
+            
+            // Visual Corners
+            Group {
+                // Top Left
+                cornerShape(length: length, thickness: thickness, position: .topLeft)
+                    .position(x: cropRect.minX + length/2 - thickness/2, y: cropRect.minY + length/2 - thickness/2)
+                
+                // Top Right
+                cornerShape(length: length, thickness: thickness, position: .topRight)
+                    .position(x: cropRect.maxX - length/2 + thickness/2, y: cropRect.minY + length/2 - thickness/2)
+                
+                // Bottom Left
+                cornerShape(length: length, thickness: thickness, position: .bottomLeft)
+                    .position(x: cropRect.minX + length/2 - thickness/2, y: cropRect.maxY - length/2 + thickness/2)
+                
+                // Bottom Right
+                cornerShape(length: length, thickness: thickness, position: .bottomRight)
+                    .position(x: cropRect.maxX - length/2 + thickness/2, y: cropRect.maxY - length/2 + thickness/2)
+            }
+            .foregroundColor(.white)
+            .allowsHitTesting(false)
         }
-        .foregroundColor(.white)
+    }
+    
+    enum CornerPosition {
+        case topLeft, topRight, bottomLeft, bottomRight
+    }
+    
+    private func cornerHandle(position: CornerPosition, size: CGFloat, onDrag: @escaping (CGSize) -> Void) -> some View {
+        Color.clear
+            .frame(width: size, height: size)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        startInteracting()
+                        onDrag(value.translation)
+                    }
+                    .onEnded { _ in
+                        stopInteracting()
+                    }
+            )
+    }
+    
+    private func cornerShape(length: CGFloat, thickness: CGFloat, position: CornerPosition) -> some View {
+        Path { path in
+            switch position {
+            case .topLeft:
+                path.move(to: CGPoint(x: 0, y: length))
+                path.addLine(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: length, y: 0))
+            case .topRight:
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: length, y: 0))
+                path.addLine(to: CGPoint(x: length, y: length))
+            case .bottomLeft:
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: 0, y: length))
+                path.addLine(to: CGPoint(x: length, y: length))
+            case .bottomRight:
+                path.move(to: CGPoint(x: 0, y: length))
+                path.addLine(to: CGPoint(x: length, y: length))
+                path.addLine(to: CGPoint(x: length, y: 0))
+            }
+        }
+        .stroke(Color.white, lineWidth: thickness)
+        .frame(width: length, height: length)
     }
     
     private func rotate(_ degrees: Double) {
-        withAnimation {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             rotation += degrees
         }
     }
     
     private func reset() {
-        withAnimation {
+        withAnimation(.spring()) {
             scale = 1.0
             offset = .zero
             lastScale = 1.0
             lastOffset = .zero
             rotation = 0
+            fineRotation = 0
+            selectedAspectRatio = .original
         }
     }
     
     private func cropImage() {
-        // 1. Handle rotation
-        guard let rotatedImage = originalImage.rotated(by: Measurement(value: rotation, unit: .degrees)) else {
+        // 1. Handle rotation (both 90-degree and fine-tuning)
+        let totalRotation = rotation + fineRotation
+        guard let rotatedImage = originalImage.rotated(by: Measurement(value: totalRotation, unit: .degrees)) else {
             onCrop(originalImage)
             dismiss()
             return
         }
         
         // 2. Calculate coordinates
-        // Get the crop box size in view coordinates
-        let cropBoxSize = getCropSize(in: containerSize)
-        
         // Calculate the image's display size (fitted in container)
-        // Note: The image inside the view is fitted to containerSize using aspectFit
         let widthRatio = containerSize.width / rotatedImage.size.width
         let heightRatio = containerSize.height / rotatedImage.size.height
         let baseScale = min(widthRatio, heightRatio)
         
-        // Total scale applied to image
         let totalScale = baseScale * scale
         
-        // Calculate the center of the crop box relative to the image center in view coordinates
-        // Visual center of image is moved by `offset`
-        // Visual center of crop box is at (0,0) (relative to container center)
-        // Vector from ImageCenter to CropBoxCenter is -offset
-        
-        // Convert to image coordinates
-        // Center of crop rect in image = ImageCenter + (-offset / totalScale)
-        let imageCenter = CGPoint(x: rotatedImage.size.width / 2, y: rotatedImage.size.height / 2)
-        let cropCenterInImage = CGPoint(
-            x: imageCenter.x - (offset.width / totalScale),
-            y: imageCenter.y - (offset.height / totalScale)
+        // Image center in view coordinates
+        let imageCenterInView = CGPoint(
+            x: containerSize.width / 2 + offset.width,
+            y: containerSize.height / 2 + offset.height
         )
         
-        let cropWidthInImage = cropBoxSize.width / totalScale
-        let cropHeightInImage = cropBoxSize.height / totalScale
+        // Crop rect center relative to image center in view coordinates
+        let cropCenterRelativeToImage = CGPoint(
+            x: cropRect.midX - imageCenterInView.x,
+            y: cropRect.midY - imageCenterInView.y
+        )
         
-        let cropRect = CGRect(
+        // Convert to image coordinates
+        let imageCenter = CGPoint(x: rotatedImage.size.width / 2, y: rotatedImage.size.height / 2)
+        let cropCenterInImage = CGPoint(
+            x: imageCenter.x + (cropCenterRelativeToImage.x / totalScale),
+            y: imageCenter.y + (cropCenterRelativeToImage.y / totalScale)
+        )
+        
+        let cropWidthInImage = cropRect.width / totalScale
+        let cropHeightInImage = cropRect.height / totalScale
+        
+        let cropRectInImage = CGRect(
             x: cropCenterInImage.x - cropWidthInImage / 2,
             y: cropCenterInImage.y - cropHeightInImage / 2,
             width: cropWidthInImage,
@@ -374,7 +519,7 @@ struct CropView: View {
         )
         
         // 3. Crop
-        if let cgImage = rotatedImage.cgImage?.cropping(to: cropRect) {
+        if let cgImage = rotatedImage.cgImage?.cropping(to: cropRectInImage) {
             let croppedUIImage = UIImage(cgImage: cgImage, scale: originalImage.scale, orientation: .up)
             onCrop(croppedUIImage)
         } else {
@@ -383,10 +528,27 @@ struct CropView: View {
         
         dismiss()
     }
-    
-    private func cropImageInternal() -> UIImage {
-        // Legacy, unused now
-        return originalImage
+}
+
+struct GridLines: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        
+        // Vertical lines
+        path.move(to: CGPoint(x: rect.width / 3, y: 0))
+        path.addLine(to: CGPoint(x: rect.width / 3, y: rect.height))
+        
+        path.move(to: CGPoint(x: rect.width * 2 / 3, y: 0))
+        path.addLine(to: CGPoint(x: rect.width * 2 / 3, y: rect.height))
+        
+        // Horizontal lines
+        path.move(to: CGPoint(x: 0, y: rect.height / 3))
+        path.addLine(to: CGPoint(x: rect.width, y: rect.height / 3))
+        
+        path.move(to: CGPoint(x: 0, y: rect.height * 2 / 3))
+        path.addLine(to: CGPoint(x: rect.width, y: rect.height * 2 / 3))
+        
+        return path
     }
 }
 
@@ -397,16 +559,13 @@ extension UIImage {
         
         var newSize = CGRect(origin: .zero, size: self.size)
             .applying(CGAffineTransform(rotationAngle: radians)).size
-        // Trim off the extremely small float value to prevent core graphics from rounding it up
         newSize.width = floor(newSize.width)
         newSize.height = floor(newSize.height)
         
         UIGraphicsBeginImageContextWithOptions(newSize, false, self.scale)
         guard let context = UIGraphicsGetCurrentContext() else { return nil }
         
-        // Move origin to middle
         context.translateBy(x: newSize.width/2, y: newSize.height/2)
-        // Rotate around middle
         context.rotate(by: radians)
         
         self.draw(in: CGRect(x: -self.size.width/2, y: -self.size.height/2, width: self.size.width, height: self.size.height))
