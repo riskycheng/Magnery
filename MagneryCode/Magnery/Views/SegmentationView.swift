@@ -114,7 +114,6 @@ struct SegmentationView: View {
     @State private var foregroundYOffset: CGFloat = 0
     @State private var processingPhase: ProcessingPhase = .initial
     @State private var noObjectDetected = false
-    @State private var processingText = "识别中..."
     @State private var isAnimatingText = false
     @State private var scanOffset: CGFloat = -1.0
     @State private var rotation: Double = 0.0
@@ -153,9 +152,8 @@ struct SegmentationView: View {
             GeometryReader { geometry in
                 Image(uiImage: currentImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
                     .blur(radius: backgroundBlur)
                     .opacity(isProcessing ? 0.3 : 0.2)
                     .overlay(
@@ -263,41 +261,11 @@ struct SegmentationView: View {
                                     .fill(Color.white)
                                     .frame(width: 8, height: 8)
                                     .shadow(color: .white, radius: 10)
-                                
-                                // Progress percentage
-                                Text("\(Int(processingProgress * 100))%")
-                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.8))
-                                    .offset(y: 25)
                             }
                             .onAppear {
                                 withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
                                     rotation = 360
                                 }
-                            }
-                            
-                            VStack(spacing: 8) {
-                                Text(processingText)
-                                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                    .shadow(radius: 10)
-                                
-                                if processingPhase == .initial || processingPhase == .detecting {
-                                    Text("正在分析图像特征...")
-                                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.6))
-                                        .transition(.opacity)
-                                } else {
-                                    Text("AI 正在智能提取主体...")
-                                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                                        .foregroundColor(.white.opacity(0.6))
-                                        .transition(.opacity)
-                                }
-                            }
-                            .scaleEffect(isAnimatingText ? 1.02 : 1.0)
-                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimatingText)
-                            .onAppear {
-                                isAnimatingText = true
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -529,9 +497,11 @@ struct SegmentationView: View {
     }
     
     private func processImage() {
+        let startTime = Date()
+        let minDuration: TimeInterval = 2.0 // Minimum duration to show the fancy scanning animation
+        
         isProcessing = true
         noObjectDetected = false
-        processingText = "AI 深度识别中..."
         isAnimatingText = false
         processingProgress = 0.0
         backgroundBlur = 0
@@ -543,21 +513,14 @@ struct SegmentationView: View {
         foregroundYOffset = 0
         processingPhase = .initial
         
-        // Start progress animation
-        withAnimation(.linear(duration: 3.0)) {
-            processingProgress = 0.95
-        }
-        
         VisionService.shared.removeBackground(from: currentImage) { result in
-            DispatchQueue.main.async {
+            let elapsedTime = Date().timeIntervalSince(startTime)
+            let remainingTime = max(0, minDuration - elapsedTime)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + remainingTime) {
                 if let result = result {
                     let impactMed = UIImpactFeedbackGenerator(style: .medium)
                     impactMed.impactOccurred()
-                    
-                    withAnimation {
-                        processingPhase = .enhancing
-                        self.processingText = "正在提取主体..."
-                    }
                     
                     // Use maxHeight to fit screen better
                     let screenSize = UIScreen.main.bounds
@@ -594,18 +557,23 @@ struct SegmentationView: View {
                         self.backgroundBlur = 30
                     }
                     
-                    withAnimation(.interpolatingSpring(stiffness: 120, damping: 15).delay(0.2)) {
+                    // Immediately start fading out the processing indicator
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        self.isProcessing = false
+                    }
+                    
+                    withAnimation(.interpolatingSpring(stiffness: 120, damping: 15).delay(0.1)) {
                         self.foregroundScale = 1.1
                         self.foregroundOpacity = 1.0
                     }
                     
                     let impactHeavy = UIImpactFeedbackGenerator(style: .medium)
                     impactHeavy.prepare()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         impactHeavy.impactOccurred()
                     }
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         withAnimation(.easeInOut(duration: 0.6)) {
                             self.showBorder = true
                             self.foregroundScale = 1.0
@@ -615,14 +583,10 @@ struct SegmentationView: View {
                         notificationSuccess.notificationOccurred(.success)
                     }
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         let notificationSuccess = UINotificationFeedbackGenerator()
                         notificationSuccess.notificationOccurred(.success)
-                        
-                        withAnimation(.easeOut(duration: 0.3)) {
-                            self.processingProgress = 1.0
-                            self.isProcessing = false
-                        }
+                        self.processingProgress = 1.0
                     }
                 } else {
                     // No object detected
