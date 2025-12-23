@@ -16,6 +16,7 @@ struct CropView: View {
     @State private var containerSize: CGSize = .zero
     @State private var isInteracting = false
     @State private var interactionTimer: Timer?
+    @State private var dragRotationStart: Double = 0
     
     // Crop box state (in view coordinates)
     @State private var cropRect: CGRect = .zero
@@ -29,6 +30,8 @@ struct CropView: View {
         case square = "1:1"
         case ratio3_4 = "3:4"
         case ratio4_3 = "4:3"
+        case ratio2_3 = "2:3"
+        case ratio3_2 = "3:2"
         case ratio9_16 = "9:16"
         case ratio16_9 = "16:9"
         
@@ -38,6 +41,8 @@ struct CropView: View {
             case .square: return 1.0
             case .ratio3_4: return 3.0/4.0
             case .ratio4_3: return 4.0/3.0
+            case .ratio2_3: return 2.0/3.0
+            case .ratio3_2: return 3.0/2.0
             case .ratio9_16: return 9.0/16.0
             case .ratio16_9: return 16.0/9.0
             }
@@ -49,6 +54,8 @@ struct CropView: View {
             case .square: return "square"
             case .ratio3_4: return "rectangle.portrait"
             case .ratio4_3: return "rectangle"
+            case .ratio2_3: return "rectangle.portrait.fill"
+            case .ratio3_2: return "rectangle.fill"
             case .ratio9_16: return "iphone"
             case .ratio16_9: return "tv"
             }
@@ -63,28 +70,43 @@ struct CropView: View {
                 // Top Bar
                 HStack {
                     Button(action: { dismiss() }) {
-                        Text("取消")
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
-                            .font(.system(size: 17))
+                            .frame(width: 36, height: 36)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
                     }
                     
                     Spacer()
                     
                     Text("编辑图片")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
+                        .kerning(1)
                     
                     Spacer()
                     
-                    Button(action: cropImage) {
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        cropImage()
+                    }) {
                         Text("完成")
-                            .foregroundColor(.orange)
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(Color.orange)
+                            .clipShape(Capsule())
+                            .shadow(color: .orange.opacity(0.3), radius: 10, x: 0, y: 4)
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 20)
+                .padding(.top, 15)
+                .padding(.bottom, 15)
+                .background(.ultraThinMaterial.opacity(0.5))
+                .background(Color.black.opacity(0.4))
                 
                 // Main Editing Area
                 GeometryReader { geometry in
@@ -170,40 +192,93 @@ struct CropView: View {
                 .clipped()
                 
                 // Bottom Controls
-                VStack(spacing: 24) {
-                    // Fine Rotation Slider
+                VStack(spacing: 0) {
+                    // Fine Rotation Interactive Ruler
                     VStack(spacing: 12) {
-                        HStack {
-                            Image(systemName: "rotate.left")
-                                .font(.system(size: 14))
-                                .foregroundColor(.gray)
+                        HStack(spacing: 0) {
+                            Text("\(Int(fineRotation))°")
+                                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                .foregroundColor(.orange)
+                                .frame(width: 45, alignment: .leading)
                             
-                            Slider(value: $fineRotation, in: -45...45)
-                                .accentColor(.orange)
-                                .onChange(of: fineRotation) { _ in
-                                    startInteracting()
-                                    // Use a short timer to stop interacting after slider stops
-                                    interactionTimer?.invalidate()
-                                    interactionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
-                                        stopInteracting()
+                            // Interactive Ruler
+                            GeometryReader { rulerGeo in
+                                let width = rulerGeo.size.width
+                                let midX = width / 2
+                                
+                                ZStack {
+                                    // Background for touch area
+                                    Color.clear.contentShape(Rectangle())
+                                    
+                                    // Moving Ticks
+                                    // We draw more ticks to allow for sliding
+                                    Canvas { context, size in
+                                        let tickCount = 61 // -30 to 30
+                                        let spacing: CGFloat = 10
+                                        let offset = CGFloat(fineRotation) * spacing
+                                        
+                                        for i in -tickCount...tickCount {
+                                            let x = midX + CGFloat(i) * spacing - offset
+                                            
+                                            if x >= 0 && x <= size.width {
+                                                let isMajor = i % 5 == 0
+                                                let height: CGFloat = isMajor ? 16 : 8
+                                                let opacity = 1.0 - abs(x - midX) / midX
+                                                
+                                                var path = Path()
+                                                path.move(to: CGPoint(x: x, y: (size.height - height) / 2))
+                                                path.addLine(to: CGPoint(x: x, y: (size.height + height) / 2))
+                                                
+                                                context.stroke(path, with: .color(Color.white.opacity(opacity * (isMajor ? 0.6 : 0.3))), lineWidth: isMajor ? 2 : 1.5)
+                                            }
+                                        }
                                     }
+                                    
+                                    // Center Indicator (Static)
+                                    Rectangle()
+                                        .fill(Color.orange)
+                                        .frame(width: 3, height: 24)
+                                        .shadow(color: .orange.opacity(0.5), radius: 4)
                                 }
+                                .gesture(
+                                    DragGesture()
+                                        .onChanged { value in
+                                            if !isInteracting {
+                                                startInteracting()
+                                                dragRotationStart = fineRotation
+                                            }
+                                            
+                                            // Sensitivity: 1 point = 0.2 degrees
+                                            let delta = Double(value.translation.width) * 0.2
+                                            let newValue = dragRotationStart - delta
+                                            fineRotation = max(-45, min(45, newValue))
+                                            
+                                            interactionTimer?.invalidate()
+                                        }
+                                        .onEnded { _ in
+                                            stopInteracting()
+                                        }
+                                )
+                            }
+                            .frame(height: 40)
                             
-                            Image(systemName: "rotate.right")
-                                .font(.system(size: 14))
-                                .foregroundColor(.gray)
+                            Button(action: {
+                                withAnimation(.spring()) { fineRotation = 0 }
+                            }) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            .frame(width: 45, alignment: .trailing)
                         }
-                        .padding(.horizontal, 40)
-                        
-                        Text("\(Int(fineRotation))°")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(.orange)
+                        .padding(.horizontal, 20)
                     }
-                    .padding(.top, 20)
+                    .padding(.vertical, 16)
+                    .background(Color.white.opacity(0.03))
                     
                     // Aspect Ratio Selector
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 25) {
+                        HStack(spacing: 22) {
                             ForEach(AspectRatio.allCases, id: \.self) { ratio in
                                 Button(action: {
                                     let impact = UIImpactFeedbackGenerator(style: .light)
@@ -212,19 +287,28 @@ struct CropView: View {
                                         selectedAspectRatio = ratio
                                     }
                                 }) {
-                                    VStack(spacing: 8) {
-                                        Image(systemName: ratio.icon)
-                                            .font(.system(size: 20))
+                                    VStack(spacing: 6) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .stroke(selectedAspectRatio == ratio ? Color.orange : Color.white.opacity(0.3), lineWidth: 1.5)
+                                                .frame(width: 22, height: 22)
+                                            
+                                            Image(systemName: ratio.icon)
+                                                .font(.system(size: 10))
+                                                .foregroundColor(selectedAspectRatio == ratio ? .orange : .white.opacity(0.6))
+                                        }
+                                        
                                         Text(ratio.rawValue)
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(.system(size: 10, weight: selectedAspectRatio == ratio ? .bold : .medium))
+                                            .foregroundColor(selectedAspectRatio == ratio ? .orange : .white.opacity(0.6))
                                     }
-                                    .foregroundColor(selectedAspectRatio == ratio ? .orange : .white)
-                                    .frame(width: 50)
                                 }
                             }
                         }
-                        .padding(.horizontal, 30)
+                        .padding(.horizontal, 25)
+                        .padding(.top, 4) // Prevent truncation
                     }
+                    .padding(.vertical, 12)
                     
                     // Toolbar
                     HStack {
@@ -233,8 +317,12 @@ struct CropView: View {
                             impact.impactOccurred()
                             rotate(-90) 
                         }) {
-                            Image(systemName: "rotate.left.fill")
-                                .font(.title2)
+                            VStack(spacing: 4) {
+                                Image(systemName: "rotate.left.fill")
+                                    .font(.system(size: 18))
+                                Text("左转")
+                                    .font(.system(size: 9))
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         
@@ -244,7 +332,8 @@ struct CropView: View {
                             reset()
                         }) {
                             Text("重置")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 8)
                                 .background(Color.white.opacity(0.1))
@@ -257,15 +346,27 @@ struct CropView: View {
                             impact.impactOccurred()
                             rotate(90) 
                         }) {
-                            Image(systemName: "rotate.right.fill")
-                                .font(.title2)
+                            VStack(spacing: 4) {
+                                Image(systemName: "rotate.right.fill")
+                                    .font(.system(size: 18))
+                                Text("右转")
+                                    .font(.system(size: 9))
+                            }
                         }
                         .frame(maxWidth: .infinity)
                     }
                     .foregroundColor(.white)
-                    .padding(.bottom, 30)
+                    .padding(.top, 8)
+                    .padding(.bottom, (UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 20) > 0 ? 10 : 20)
                 }
-                .background(Color.black)
+                .background(.ultraThinMaterial.opacity(0.8))
+                .background(Color.black.opacity(0.6))
+                .overlay(
+                    Rectangle()
+                        .fill(Color.white.opacity(0.05))
+                        .frame(height: 1)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                )
             }
         }
     }
