@@ -213,6 +213,8 @@ struct SegmentationView: View {
                         }
                         .offset(y: geometry.size.height * scanOffset)
                         .onAppear {
+                            // Reset to start position before animating
+                            scanOffset = -1.0
                             withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: true)) {
                                 scanOffset = 1.0
                             }
@@ -263,6 +265,7 @@ struct SegmentationView: View {
                                     .shadow(color: .white, radius: 10)
                             }
                             .onAppear {
+                                rotation = 0.0
                                 withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
                                     rotation = 360
                                 }
@@ -500,9 +503,13 @@ struct SegmentationView: View {
         let startTime = Date()
         let minDuration: TimeInterval = 2.0 // Minimum duration to show the fancy scanning animation
         
+        // Reset animation states to ensure they resume correctly
+        scanOffset = -1.0
+        rotation = 0.0
+        isAnimatingText = false
+        
         isProcessing = true
         noObjectDetected = false
-        isAnimatingText = false
         processingProgress = 0.0
         backgroundBlur = 0
         showBorder = false
