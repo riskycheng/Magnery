@@ -7,6 +7,7 @@ enum HomeMode {
 
 struct HomeView: View {
     @EnvironmentObject var store: MagnetStore
+    @Namespace private var modeNamespace
     @State private var showingCamera = false
     @State private var ringRotation: Double = 0
     @State private var dotScale: CGFloat = 1.0
@@ -279,48 +280,85 @@ struct HomeView: View {
     }
     
     private var modeAndGroupingToggle: some View {
-        HStack {
-            Button(action: {
-                withAnimation(.spring()) {
-                    homeMode = homeMode == .camera ? .map : .camera
+        HStack(spacing: 12) {
+            // Mode Switcher (Camera / Map) - Custom Segmented Control
+            HStack(spacing: 0) {
+                ForEach([HomeMode.camera, HomeMode.map], id: \.self) { mode in
+                    Button(action: {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            homeMode = mode
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: mode == .camera ? "camera.fill" : "map.fill")
+                                .font(.system(size: 12, weight: .bold))
+                            
+                            if homeMode == mode {
+                                Text(mode == .camera ? "相机" : "地图")
+                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .transition(.opacity.combined(with: .move(edge: .leading)))
+                            }
+                        }
+                        .foregroundColor(homeMode == mode ? .white : .secondary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(
+                            ZStack {
+                                if homeMode == mode {
+                                    Capsule()
+                                        .fill(Color.black)
+                                        .matchedGeometryEffect(id: "modeTab", in: modeNamespace)
+                                }
+                            }
+                        )
+                    }
                 }
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: homeMode == .camera ? "map" : "camera")
-                        .font(.system(size: 14))
-                    Text(homeMode == .camera ? "地图" : "相机")
-                        .font(.subheadline)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.orange)
-                .clipShape(Capsule())
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             }
+            .padding(4)
+            .background(Color.black.opacity(0.05))
+            .clipShape(Capsule())
             
             Spacer()
             
-            if homeMode == .camera {
-                Button(action: {
+            // Grouping Toggle (Location / Time) - Refined Pill
+            Button(action: {
+                let impact = UIImpactFeedbackGenerator(style: .light)
+                impact.impactOccurred()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                     store.setGroupingMode(store.groupingMode == .location ? .time : .location)
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: store.groupingMode == .location ? "mappin" : "calendar")
-                            .font(.system(size: 14))
-                        Text(store.groupingMode == .location ? "按地点" : "按日期")
-                            .font(.subheadline)
-                    }
-                    .foregroundColor(.primary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.white)
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                 }
+            }) {
+                HStack(spacing: 8) {
+                    ZStack {
+                        Image(systemName: "mappin.and.ellipse")
+                            .opacity(store.groupingMode == .location ? 1 : 0)
+                            .scaleEffect(store.groupingMode == .location ? 1 : 0.5)
+                        Image(systemName: "calendar")
+                            .opacity(store.groupingMode == .time ? 1 : 0)
+                            .scaleEffect(store.groupingMode == .time ? 1 : 0.5)
+                    }
+                    .font(.system(size: 12, weight: .bold))
+                    
+                    Text(store.groupingMode == .location ? "按地点" : "按日期")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                }
+                .foregroundColor(.primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(Color.white)
+                        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
+                )
             }
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 20)
     }
     
     private var greeting: String {
