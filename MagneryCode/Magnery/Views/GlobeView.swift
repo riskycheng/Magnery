@@ -19,7 +19,6 @@ struct GlobeView: View {
             
             // Close button
             HStack {
-                Spacer()
                 Button(action: {
                     dismiss()
                 }) {
@@ -29,7 +28,8 @@ struct GlobeView: View {
                         .shadow(radius: 4)
                 }
                 .padding(.top, 10)
-                .padding(.trailing, 20)
+                .padding(.leading, 20)
+                Spacer()
             }
             
             // Selected location detail card
