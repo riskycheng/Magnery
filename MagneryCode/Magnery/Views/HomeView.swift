@@ -45,7 +45,7 @@ struct HomeView: View {
                                 .scaleEffect(homeMode == .map ? 1 : 0.9)
                         }
                         .frame(height: 260)
-                        .padding(.top, 120) // Restored to previous spacing
+                        .padding(.top, 130) // Increased margin to give the title more breathing room
                         .opacity(visualProgress)
                         .scaleEffect(0.8 + (0.2 * visualProgress))
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: homeMode)
@@ -158,10 +158,7 @@ struct HomeView: View {
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .opacity(isDocked ? 1 : 0)
             )
-            
-            Spacer(minLength: 0)
         }
-        .frame(height: isDocked ? nil : 140)
         .ignoresSafeArea(edges: .top)
     }
     
@@ -195,7 +192,8 @@ struct HomeView: View {
             )
             .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
             .padding(.horizontal, 20)
-            .padding(.vertical, 20)
+            .padding(.bottom, 20)
+            .padding(.top, 15)
     }
     
     private var headerView: some View {
@@ -249,7 +247,8 @@ struct HomeView: View {
                     .foregroundColor(.black)
             }
         }
-        .padding(.vertical, 40)
+        .padding(.bottom, 20)
+        .padding(.top, 15)
     }
     
     
@@ -367,38 +366,30 @@ struct GroupCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Image(systemName: groupingMode == .location ? "mappin.circle.fill" : "calendar")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.primary)
-                        Text(group.title)
-                            .font(.system(.headline, design: .rounded))
-                            .foregroundColor(.primary)
-                    }
-                    
-                    Text(group.subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: groupingMode == .location ? "mappin.circle.fill" : "calendar")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text(group.title)
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundColor(.primary)
                 }
                 
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.secondary.opacity(0.5))
+                Text(group.subtitle)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     ForEach(group.items.prefix(12)) { item in
                         if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
                             Image(uiImage: image)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: 85, height: 85)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .frame(width: 72, height: 72)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                         }
                     }
