@@ -3,32 +3,131 @@ import SwiftUI
 import Combine
 import CoreLocation
 
+struct SectionData: Identifiable {
+    let id = UUID()
+    let section: String
+    let groups: [MagnetGroup]
+}
+
 @MainActor
 class MagnetStore: ObservableObject {
     @Published var magnets: [MagnetItem] = []
     @Published var groupingMode: GroupingMode = .location
     
+    // Cache for grouped sections to improve performance
+    @Published var sections: [SectionData] = []
+    
     private let saveKey = "SavedMagnets"
     
     init() {
         loadMagnets()
+        updateSections()
     }
     
     func addMagnet(_ magnet: MagnetItem) {
         magnets.append(magnet)
         saveMagnets()
+        updateSections()
     }
     
     func deleteMagnet(_ magnet: MagnetItem) {
         magnets.removeAll { $0.id == magnet.id }
         saveMagnets()
+        updateSections()
     }
     
     func updateMagnet(_ magnet: MagnetItem) {
         if let index = magnets.firstIndex(where: { $0.id == magnet.id }) {
             magnets[index] = magnet
             saveMagnets()
+            updateSections()
         }
+    }
+    
+    func setGroupingMode(_ mode: GroupingMode) {
+        groupingMode = mode
+        updateSections()
+    }
+    
+    func updateSections() {
+        let groups = groupedMagnets()
+        
+        if groupingMode == .time {
+            let calendar = Calendar.current
+            let groupedByMonth = Dictionary(grouping: groups) { group -> String in
+                if let firstItem = group.items.first {
+                    let components = calendar.dateComponents([.year, .month], from: firstItem.date)
+                    let monthFormatter = DateFormatter()
+                    monthFormatter.dateFormat = "M月份"
+                    if let date = calendar.date(from: components) {
+                        return monthFormatter.string(from: date)
+                    }
+                }
+                return ""
+            }
+            
+            let sortedSections = groupedByMonth.keys.sorted { key1, key2 in
+                if let groups1 = groupedByMonth[key1], let date1 = groups1.first?.items.first?.date,
+                   let groups2 = groupedByMonth[key2], let date2 = groups2.first?.items.first?.date {
+                    return date1 > date2
+                }
+                return key1 > key2
+            }
+            
+            self.sections = sortedSections.map { section in
+                let sectionGroups = groupedByMonth[section] ?? []
+                return SectionData(
+                    section: section,
+                    groups: sectionGroups.sorted { $0.items.first!.date > $1.items.first!.date }
+                )
+            }
+        } else {
+            let groupedByCity = Dictionary(grouping: groups) { group -> String in
+                return extractCityName(from: group.title)
+            }
+            
+            let sortedCities = groupedByCity.keys.sorted { city1, city2 in
+                let count1 = groupedByCity[city1]?.reduce(0) { $0 + $1.items.count } ?? 0
+                let count2 = groupedByCity[city2]?.reduce(0) { $0 + $1.items.count } ?? 0
+                if count1 == count2 {
+                    return city1 < city2
+                }
+                return count1 > count2
+            }
+            
+            self.sections = sortedCities.map { city in
+                let cityGroups = groupedByCity[city] ?? []
+                return SectionData(
+                    section: city,
+                    groups: cityGroups.sorted { group1, group2 in
+                        if group1.items.count == group2.items.count {
+                            return group1.title < group2.title
+                        }
+                        return group1.items.count > group2.items.count
+                    }
+                )
+            }
+        }
+    }
+    
+    private func extractCityName(from location: String) -> String {
+        if location == "未知位置" {
+            return "未知位置"
+        }
+        
+        if location.contains("市") {
+            if let range = location.range(of: "市") {
+                return String(location[..<range.upperBound])
+            }
+        }
+        
+        if location.contains("省") {
+            if let range = location.range(of: "省") {
+                return String(location[..<range.upperBound])
+            }
+        }
+        
+        return location
     }
     
     func groupedMagnets() -> [MagnetGroup] {

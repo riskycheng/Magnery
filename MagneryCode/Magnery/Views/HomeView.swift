@@ -9,31 +9,48 @@ struct HomeView: View {
     @EnvironmentObject var store: MagnetStore
     @State private var showingCamera = false
     @State private var ringRotation: Double = 0
+    @State private var dotScale: CGFloat = 1.0
     @State private var scrollOffset: CGFloat = 0
     @State private var isCollapsed = false
     @State private var lastScrollUpdate: CGFloat = 0
     @State private var homeMode: HomeMode = .camera
+    @State private var hasTriggeredHaptic = false
     
     private let collapsedThreshold: CGFloat = 200
     private let maxHeaderHeight: CGFloat = 360
     private let scrollUpdateThreshold: CGFloat = 2  // Only update every 2 points for smoother animation
     
+    private var visualProgress: CGFloat {
+        let rawProgress = 1.0 + (scrollOffset / 150.0)
+        return min(1.0, max(0.0, rawProgress))
+    }
+    
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .top) {
                 Color(red: 0.95, green: 0.95, blue: 0.97)
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Collapsed header (shown when scrolled)
-                    collapsedHeader
-                    
-                    // Main scrollable content
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            // Expanded header content
-                            expandedHeaderContent
+                // Main scrollable content
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Visual elements that scroll away (Camera Ring / Map)
+                        ZStack {
+                            cameraButton
+                                .opacity(homeMode == .camera ? 1 : 0)
+                                .scaleEffect(homeMode == .camera ? 1 : 0.9)
                             
+                            mapViewContainer
+                                .opacity(homeMode == .map ? 1 : 0)
+                                .scaleEffect(homeMode == .map ? 1 : 0.9)
+                        }
+                        .frame(height: 260)
+                        .padding(.top, 120) // Restored to previous spacing
+                        .opacity(visualProgress)
+                        .scaleEffect(0.8 + (0.2 * visualProgress))
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: homeMode)
+                        
+                        VStack(spacing: 0) {
                             // Mode and Grouping toggle
                             modeAndGroupingToggle
                                 .padding(.top, 20)
@@ -42,39 +59,24 @@ struct HomeView: View {
                             // Content list
                             contentList
                         }
-                        .background(
-                            GeometryReader { geometry in
-                                Color.clear
-                                    .preference(
-                                        key: ScrollOffsetPreferenceKey.self,
-                                        value: geometry.frame(in: .named("scroll")).minY
-                                    )
-                            }
-                        )
+                        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
                     }
-                    .coordinateSpace(name: "scroll")
-                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                        // Only update if the change is significant to reduce redraws
-                        let difference = abs(value - lastScrollUpdate)
-                        let newCollapsed = value < -collapsedThreshold
-                        
-                        // Always update if collapse state changes, otherwise throttle updates
-                        if newCollapsed != isCollapsed {
-                            // State change - update immediately
-                            isCollapsed = newCollapsed
-                            scrollOffset = value
-                            lastScrollUpdate = value
-                            
-                            // Haptic feedback
-                            let impact = UIImpactFeedbackGenerator(style: .light)
-                            impact.impactOccurred()
-                        } else if difference > scrollUpdateThreshold {
-                            // Normal scroll - throttle updates, no animation
-                            scrollOffset = value
-                            lastScrollUpdate = value
+                    .background(
+                        GeometryReader { geometry in
+                            let offset = geometry.frame(in: .named("scroll")).minY
+                            Color.clear
+                                .preference(key: ScrollOffsetPreferenceKey.self, value: offset)
                         }
-                    }
+                    )
                 }
+                .coordinateSpace(name: "scroll")
+                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                    handleScroll(value)
+                }
+                
+                // Fixed Header Layer (Text content that docks)
+                headerLayer
+                    .zIndex(1)
             }
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraView()
@@ -82,48 +84,104 @@ struct HomeView: View {
         }
     }
     
-    // Collapsed header shown when scrolled down
-    private var collapsedHeader: some View {
-        HStack {
-            Text(greeting)
-                .font(.caption)
-                .fontWeight(.semibold)
-            Spacer()
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
-        .opacity(isCollapsed ? 1 : 0)
-        .offset(y: isCollapsed ? 0 : -50)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isCollapsed)
-    }
-    
-    // Expanded header content with camera button
-    private var expandedHeaderContent: some View {
-        let progress = min(1, max(0, 1 + (scrollOffset / collapsedThreshold)))
+    private var headerLayer: some View {
+        let rawProgress = 1.0 + (scrollOffset / 100.0)
+        let progress = min(1.0, max(0.0, rawProgress))
+        let isDocked = scrollOffset < -80
         
-        return VStack(spacing: 20) {
-            headerView
-                .scaleEffect(0.8 + (0.2 * progress))
-                .opacity(progress)
-            
-            ZStack {
-                if homeMode == .camera {
-                    cameraButton
-                        .transition(.scale.combined(with: .opacity))
-                } else {
-                    mapViewContainer
-                        .transition(.scale.combined(with: .opacity))
+        // Use continuous values for smoother transitions without explicit animation
+        let titleSize = 16.0 + (12.0 * progress)
+        let verticalSpacing = 1.0 + (4.0 * progress)
+        
+        // Instead of changing alignment (which is expensive), we use a fixed alignment 
+        // and adjust the layout based on progress.
+        return VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .center, spacing: verticalSpacing) {
+                    Text(greeting)
+                        .font(.system(size: titleSize, weight: .bold, design: .rounded))
+                        .frame(maxWidth: .infinity, alignment: progress > 0.5 ? .center : .leading)
+                    
+                    ZStack {
+                        // Expanded subtitle
+                        Text("真棒！已经收集了\(store.magnets.count)个冰箱贴，走过\(uniqueLocationsCount)个城市")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .opacity(Double(max(0, (progress - 0.5) * 2)))
+                        
+                        // Collapsed subtitle (Stats)
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.grid.2x2.fill")
+                                .font(.system(size: 8))
+                            Text("\(store.magnets.count)个收藏")
+                            Text("·")
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.system(size: 8))
+                            Text("\(uniqueLocationsCount)个城市")
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .opacity(Double(max(0, (0.5 - progress) * 2)))
+                    }
+                    .frame(maxWidth: .infinity, alignment: progress > 0.5 ? .center : .leading)
+                }
+                
+                if isDocked {
+                    // Quick camera button only when docked
+                    Button(action: { 
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        showingCamera = true 
+                    }) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Color.orange)
+                            .clipShape(Circle())
+                            .shadow(color: .orange.opacity(0.3), radius: 4, x: 0, y: 2)
+                    }
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
-            .scaleEffect(0.6 + (0.4 * progress))
-            .opacity(progress)
+            .padding(.horizontal, 20)
+            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (30 * progress))
+            .padding(.bottom, 15 + (15 * progress))
+            .background(
+                Color(red: 0.95, green: 0.95, blue: 0.97)
+            )
+            .overlay(
+                Rectangle()
+                    .fill(Color.black.opacity(0.05))
+                    .frame(height: 0.5)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .opacity(isDocked ? 1 : 0)
+            )
+            
+            Spacer(minLength: 0)
         }
-        .frame(height: maxHeaderHeight * progress)
-        .padding(.top, 20 * progress)
-        .opacity(progress)
-        .blur(radius: (1 - progress) * 5)
-        .clipped()
+        .frame(height: isDocked ? nil : 140)
+        .ignoresSafeArea(edges: .top)
+    }
+    
+    private func handleScroll(_ value: CGFloat) {
+        // Only update if the change is significant enough to reduce re-renders
+        if abs(value - lastScrollUpdate) < scrollUpdateThreshold {
+            return
+        }
+        
+        lastScrollUpdate = value
+        scrollOffset = value
+        
+        let threshold: CGFloat = -100
+        let newCollapsed = value < threshold
+        
+        if newCollapsed != isCollapsed {
+            isCollapsed = newCollapsed
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred(intensity: newCollapsed ? 0.8 : 0.5)
+        }
     }
     
     private var mapViewContainer: some View {
@@ -157,25 +215,25 @@ struct HomeView: View {
             ColorfulRing()
                 .frame(width: 180, height: 180)
                 .rotationEffect(.degrees(ringRotation), anchor: .center)
-                .onAppear {
-                    // Reset and start animation
-                    ringRotation = 0
-                    withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
-                        ringRotation = 360
-                    }
-                }
-                .onDisappear {
-                    // Reset rotation when it disappears to ensure it restarts correctly next time
-                    ringRotation = 0
-                }
             
-            // Dots simplified for performance
+            // Dots with pulsing animation
             ForEach(0..<8) { index in
                 Circle()
                     .fill(Color.gray.opacity(0.25))
                     .frame(width: 6, height: 6)
+                    .scaleEffect(dotScale)
                     .offset(y: -115)
                     .rotationEffect(.degrees(Double(index) * 45))
+            }
+            .onAppear {
+                // Infinite rotation: slower (12s) and continuous
+                withAnimation(.linear(duration: 12).repeatForever(autoreverses: false)) {
+                    ringRotation = 360
+                }
+                // Pulsing dots animation
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    dotScale = 1.3
+                }
             }
             
             Circle()
@@ -190,15 +248,14 @@ struct HomeView: View {
                     .font(.system(size: 32, weight: .light))
                     .foregroundColor(.black)
             }
-            // Camera scale animation removed for better performance
         }
         .padding(.vertical, 40)
     }
     
     
     private var contentList: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            ForEach(groupedBySection(), id: \.section) { sectionData in
+        LazyVStack(alignment: .leading, spacing: 20) {
+            ForEach(store.sections) { sectionData in
                 VStack(alignment: .leading, spacing: 12) {
                     if !sectionData.section.isEmpty {
                         Text(sectionData.section)
@@ -220,7 +277,6 @@ struct HomeView: View {
         }
         .padding(.top, 8)
         .padding(.bottom, 40)
-        .id(store.groupingMode)  // Only re-render when grouping mode changes
     }
     
     private var modeAndGroupingToggle: some View {
@@ -248,7 +304,7 @@ struct HomeView: View {
             
             if homeMode == .camera {
                 Button(action: {
-                    store.groupingMode = store.groupingMode == .location ? .time : .location
+                    store.setGroupingMode(store.groupingMode == .location ? .time : .location)
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: store.groupingMode == .location ? "mappin" : "calendar")
@@ -281,98 +337,6 @@ struct HomeView: View {
     private var uniqueLocationsCount: Int {
         Set(store.magnets.map { $0.location }).count
     }
-    
-    private func groupedBySection() -> [SectionData] {
-        let groups = store.groupedMagnets()
-        
-        if store.groupingMode == .time {
-            let calendar = Calendar.current
-            let groupedByMonth = Dictionary(grouping: groups) { group -> String in
-                if let firstItem = group.items.first {
-                    let components = calendar.dateComponents([.year, .month], from: firstItem.date)
-                    let monthFormatter = DateFormatter()
-                    monthFormatter.dateFormat = "M月份"
-                    if let date = calendar.date(from: components) {
-                        return monthFormatter.string(from: date)
-                    }
-                }
-                return ""
-            }
-            
-            // Sort dictionary keys first to ensure stable ordering
-            let sortedSections = groupedByMonth.keys.sorted { key1, key2 in
-                // Extract dates for comparison
-                if let groups1 = groupedByMonth[key1], let date1 = groups1.first?.items.first?.date,
-                   let groups2 = groupedByMonth[key2], let date2 = groups2.first?.items.first?.date {
-                    return date1 > date2
-                }
-                return key1 > key2
-            }
-            
-            return sortedSections.map { section in
-                let sectionGroups = groupedByMonth[section] ?? []
-                return SectionData(
-                    section: section,
-                    groups: sectionGroups.sorted { $0.items.first!.date > $1.items.first!.date }
-                )
-            }
-        } else {
-            let groupedByCity = Dictionary(grouping: groups) { group -> String in
-                return extractCityName(from: group.title)
-            }
-            
-            // Sort dictionary keys first to ensure stable ordering
-            let sortedCities = groupedByCity.keys.sorted { city1, city2 in
-                let count1 = groupedByCity[city1]?.reduce(0) { $0 + $1.items.count } ?? 0
-                let count2 = groupedByCity[city2]?.reduce(0) { $0 + $1.items.count } ?? 0
-                if count1 == count2 {
-                    // If counts are equal, sort by city name for stability
-                    return city1 < city2
-                }
-                return count1 > count2
-            }
-            
-            return sortedCities.map { city in
-                let cityGroups = groupedByCity[city] ?? []
-                return SectionData(
-                    section: city,
-                    groups: cityGroups.sorted { group1, group2 in
-                        if group1.items.count == group2.items.count {
-                            // If counts are equal, sort by title for stability
-                            return group1.title < group2.title
-                        }
-                        return group1.items.count > group2.items.count
-                    }
-                )
-            }
-        }
-    }
-    
-    private func extractCityName(from location: String) -> String {
-        if location == "未知位置" {
-            return "未知位置"
-        }
-        
-        if location.contains("市") {
-            if let range = location.range(of: "市") {
-                let cityName = String(location[..<range.upperBound])
-                return cityName
-            }
-        }
-        
-        if location.contains("省") {
-            if let range = location.range(of: "省") {
-                return String(location[..<range.upperBound])
-            }
-        }
-        
-        return location
-    }
-}
-
-struct SectionData {
-    let section: String
-    let groups: [MagnetGroup]
 }
 
 struct ColorfulRing: View {

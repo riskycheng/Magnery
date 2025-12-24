@@ -16,25 +16,30 @@ struct MapView: View {
     }
     
     var body: some View {
-        ZStack {
-            Map(coordinateRegion: $region, 
-                interactionModes: .all,
-                annotationItems: locationClusters) { cluster in
-                MapAnnotation(coordinate: cluster.coordinate) {
-                    LocationMarker(
-                        cluster: cluster,
-                        isSelected: selectedLocation?.id == cluster.id,
-                        onTap: {
-                            withAnimation {
-                                selectedLocation = cluster
-                            }
+        GeometryReader { geo in
+            ZStack {
+                if geo.size.width > 0 && geo.size.height > 0 {
+                    Map(coordinateRegion: $region, 
+                        interactionModes: .all,
+                        annotationItems: locationClusters) { cluster in
+                        MapAnnotation(coordinate: cluster.coordinate) {
+                            LocationMarker(
+                                cluster: cluster,
+                                isSelected: selectedLocation?.id == cluster.id,
+                                onTap: {
+                                    withAnimation {
+                                        selectedLocation = cluster
+                                    }
+                                }
+                            )
                         }
-                    )
+                    }
+                    .ignoresSafeArea()
+                } else {
+                    Color.clear
                 }
-            }
-            .ignoresSafeArea()
-            
-            // Fullscreen button
+                
+                // Fullscreen button
             VStack {
                 Spacer()
                 HStack {
@@ -80,6 +85,7 @@ struct MapView: View {
             GlobeView()
         }
     }
+}
     
     private var locationClusters: [LocationCluster] {
         // Group magnets by location
