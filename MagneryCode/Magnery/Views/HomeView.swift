@@ -45,8 +45,8 @@ struct HomeView: View {
                                 .opacity(homeMode == .map ? 1 : 0)
                                 .scaleEffect(homeMode == .map ? 1 : 0.9)
                         }
-                        .frame(height: 260)
-                        .padding(.top, 130) // Increased margin to give the title more breathing room
+                        .frame(height: 300) // Increased from 260 to 300
+                        .padding(.top, 110) 
                         .opacity(visualProgress)
                         .scaleEffect(0.8 + (0.2 * visualProgress))
                         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: homeMode)
@@ -212,7 +212,7 @@ struct HomeView: View {
     private var cameraButton: some View {
         ZStack {
             ColorfulRing()
-                .frame(width: 180, height: 180)
+                .frame(width: 200, height: 200) // Increased from 180 to 200 to accommodate stroke width
                 .rotationEffect(.degrees(ringRotation), anchor: .center)
             
             // Dots with pulsing animation
@@ -221,15 +221,17 @@ struct HomeView: View {
                     .fill(Color.gray.opacity(0.25))
                     .frame(width: 6, height: 6)
                     .scaleEffect(dotScale)
-                    .offset(y: -115)
+                    .offset(y: -125) // Adjusted from -115 to -125
                     .rotationEffect(.degrees(Double(index) * 45))
             }
             .onAppear {
                 // Infinite rotation: slower (12s) and continuous
+                ringRotation = 0
                 withAnimation(.linear(duration: 12).repeatForever(autoreverses: false)) {
                     ringRotation = 360
                 }
                 // Pulsing dots animation
+                dotScale = 1.0
                 withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
                     dotScale = 1.3
                 }
@@ -422,14 +424,20 @@ struct GroupCard: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(group.items.prefix(12)) { item in
-                        if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 72, height: 72)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                        ZStack {
+                            if let gifPath = item.gifPath {
+                                GIFView(url: ImageManager.shared.getFileURL(for: gifPath))
+                                    .frame(width: 72, height: 72)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            } else if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 72, height: 72)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
                         }
+                        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                     }
                 }
             }

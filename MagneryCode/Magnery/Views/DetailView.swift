@@ -39,7 +39,22 @@ struct DetailView: View {
                     
                     Spacer()
                     
-                    if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
+                    if let gifPath = currentMagnet.gifPath {
+                        GIFView(url: ImageManager.shared.getFileURL(for: gifPath))
+                            .frame(maxHeight: 350)
+                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+                            .padding(.horizontal, 40)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 0.8).combined(with: .opacity)
+                            ))
+                            .gesture(
+                                DragGesture(minimumDistance: 30)
+                                    .onEnded { value in
+                                        handleSwipeGesture(translation: value.translation)
+                                    }
+                            )
+                    } else if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fit)

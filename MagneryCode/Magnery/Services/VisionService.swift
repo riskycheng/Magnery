@@ -67,6 +67,76 @@ class VisionService {
         }
     }
     
+    func segmentAndNormalize(image: UIImage, targetSize: CGSize = CGSize(width: 512, height: 512), completion: @escaping (UIImage?) -> Void) {
+        guard let cgImage = image.cgImage else {
+            completion(nil)
+            return
+        }
+        
+        let request = VNGenerateForegroundInstanceMaskRequest()
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+        
+        do {
+            try handler.perform([request])
+            guard let result = request.results?.first as? VNInstanceMaskObservation else {
+                completion(nil)
+                return
+            }
+            
+            let instancesToUse = self.selectSubjectInstances(from: result)
+            let maskedPixelBuffer = try result.generateMaskedImage(
+                ofInstances: instancesToUse,
+                from: handler,
+                croppedToInstancesExtent: true
+            )
+            
+            let ciImage = CIImage(cvPixelBuffer: maskedPixelBuffer)
+            let context = CIContext()
+            
+            guard let outputCGImage = context.createCGImage(ciImage, from: ciImage.extent) else {
+                completion(nil)
+                return
+            }
+            
+            let segmentedImage = UIImage(cgImage: outputCGImage)
+            
+            // Normalize: Center and scale to targetSize
+            let normalizedImage = self.normalizeImage(segmentedImage, targetSize: targetSize)
+            completion(normalizedImage)
+            
+        } catch {
+            print("[VisionService] Batch segmentation error: \(error)")
+            completion(nil)
+        }
+    }
+    
+    private func normalizeImage(_ image: UIImage, targetSize: CGSize) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+        
+        return renderer.image { context in
+            // Clear background (transparent)
+            UIColor.clear.setFill()
+            context.fill(CGRect(origin: .zero, size: targetSize))
+            
+            // Calculate scaling to fit targetSize while maintaining aspect ratio
+            let widthRatio = (targetSize.width * 0.8) / image.size.width
+            let heightRatio = (targetSize.height * 0.8) / image.size.height
+            let scale = min(widthRatio, heightRatio)
+            
+            let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            let rect = CGRect(
+                x: (targetSize.width - newSize.width) / 2,
+                y: (targetSize.height - newSize.height) / 2,
+                width: newSize.width,
+                height: newSize.height
+            )
+            
+            image.draw(in: rect)
+        }
+    }
+    
     private func finishProcessing(image: UIImage, completion: @escaping (SegmentationResult?) -> Void) {
         print("[VisionService] ✓ 分割完成，输出图片尺寸: \(image.size)")
         

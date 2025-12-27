@@ -77,12 +77,45 @@ struct CameraView: View {
     @StateObject private var cameraManager = CameraManager()
     @State private var showingImagePicker = false
     @State private var showingSegmentation = false
+    @State private var isProcessingGIF = false
+    @State private var capturedGIFURL: URL?
     
     var body: some View {
         ZStack {
             if cameraManager.isAuthorized {
                 CameraPreviewView(session: cameraManager.session)
                     .ignoresSafeArea()
+                
+                if cameraManager.isRecording {
+                    Color.red.opacity(0.1)
+                        .ignoresSafeArea()
+                        .overlay(
+                            VStack {
+                                Text("正在录制...")
+                                    .foregroundColor(.white)
+                                    .padding(10)
+                                    .background(Color.black.opacity(0.5))
+                                    .cornerRadius(10)
+                                    .padding(.top, 100)
+                                Spacer()
+                            }
+                        )
+                }
+                
+                if cameraManager.isProcessingFrames && !cameraManager.isRecording {
+                    Color.black.opacity(0.7)
+                        .ignoresSafeArea()
+                        .overlay(
+                            VStack(spacing: 20) {
+                                ProgressView(value: cameraManager.processingProgress)
+                                    .progressViewStyle(LinearProgressViewStyle(tint: .orange))
+                                    .frame(width: 200)
+                                Text("正在智能分割每一帧... \(Int(cameraManager.processingProgress * 100))%")
+                                    .foregroundColor(.white)
+                                    .font(.subheadline)
+                            }
+                        )
+                }
                 
                 VStack {
                     HStack {
@@ -118,7 +151,7 @@ struct CameraView: View {
                             .frame(width: UIScreen.main.bounds.width - 40, height: UIScreen.main.bounds.width - 40)
                         }
                         
-                        Text("请将物体置于框内")
+                        Text(cameraManager.isRecording ? "松开结束录制" : "请将物体置于框内")
                             .font(.subheadline)
                             .foregroundColor(.white)
                             .shadow(radius: 2)
@@ -142,32 +175,52 @@ struct CameraView: View {
                                 )
                         }
                         
-                        Button(action: {
+                        // Capture Button with Long Press
+                        ZStack {
+                            Circle()
+                                .stroke(
+                                    AngularGradient(
+                                        colors: [
+                                            Color(red: 1.0, green: 0.95, blue: 0.6),
+                                            Color(red: 0.4, green: 0.8, blue: 0.5),
+                                            Color(red: 0.5, green: 0.6, blue: 1.0),
+                                            Color(red: 1.0, green: 0.95, blue: 0.6)
+                                        ],
+                                        center: .center
+                                    ),
+                                    lineWidth: 4
+                                )
+                                .frame(width: 80, height: 80)
+                                .rotationEffect(.degrees(cameraManager.isRecording ? 360 : 0))
+                                .animation(cameraManager.isRecording ? .linear(duration: 2).repeatForever(autoreverses: false) : .default, value: cameraManager.isRecording)
+                            
+                            Circle()
+                                .fill(cameraManager.isRecording ? Color.red : Color.white)
+                                .frame(width: 70, height: 70)
+                                .scaleEffect(cameraManager.isRecording ? 0.8 : 1.0)
+                                .animation(.spring(), value: cameraManager.isRecording)
+                        }
+                        .onTapGesture {
                             let impact = UIImpactFeedbackGenerator(style: .medium)
                             impact.impactOccurred()
                             cameraManager.capturePhoto()
-                        }) {
-                            ZStack {
-                                Circle()
-                                    .stroke(
-                                        AngularGradient(
-                                            colors: [
-                                                Color(red: 1.0, green: 0.95, blue: 0.6),
-                                                Color(red: 0.4, green: 0.8, blue: 0.5),
-                                                Color(red: 0.5, green: 0.6, blue: 1.0),
-                                                Color(red: 1.0, green: 0.95, blue: 0.6)
-                                            ],
-                                            center: .center
-                                        ),
-                                        lineWidth: 4
-                                    )
-                                    .frame(width: 80, height: 80)
-                                
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 70, height: 70)
-                            }
                         }
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5)
+                                .onEnded { _ in
+                                    let impact = UIImpactFeedbackGenerator(style: .heavy)
+                                    impact.impactOccurred()
+                                    cameraManager.startRecording()
+                                }
+                        )
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 0)
+                                .onEnded { _ in
+                                    if cameraManager.isRecording {
+                                        cameraManager.stopRecording()
+                                    }
+                                }
+                        )
                         
                         Button(action: {
                             let impact = UIImpactFeedbackGenerator(style: .light)
@@ -186,6 +239,21 @@ struct CameraView: View {
                         }
                     }
                     .padding(.bottom, 40)
+                }
+                
+                if isProcessingGIF {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                        .overlay(
+                            VStack(spacing: 20) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(1.5)
+                                Text("正在生成 GIF...")
+                                    .foregroundColor(.white)
+                                    .font(.headline)
+                            }
+                        )
                 }
             } else {
                 Color.black.ignoresSafeArea()
@@ -214,17 +282,47 @@ struct CameraView: View {
                 cameraManager.startSession()
             }
         }
+        .onChange(of: cameraManager.isProcessingFrames) { oldValue, newValue in
+            if oldValue == true && newValue == false && !cameraManager.segmentedFrames.isEmpty {
+                processCapturedFrames()
+            }
+        }
         .fullScreenCover(isPresented: $showingSegmentation) {
             if let image = cameraManager.capturedImage {
-                SegmentationView(originalImage: image)
+                SegmentationView(originalImage: image, gifURL: capturedGIFURL)
             }
         }
         .onAppear {
             cameraManager.capturedImage = nil
+            capturedGIFURL = nil
             cameraManager.startSession()
         }
         .onDisappear {
             cameraManager.stopSession()
+        }
+    }
+    
+    private func processCapturedFrames() {
+        guard !cameraManager.segmentedFrames.isEmpty else { return }
+        
+        isProcessingGIF = true
+        
+        // Use the first frame as the main image (but we need a non-transparent one for the placeholder)
+        // Actually, let's use the first original frame as the placeholder
+        cameraManager.capturedImage = cameraManager.capturedFrames.first
+        
+        GIFService.shared.createGIF(from: cameraManager.segmentedFrames) { url in
+            DispatchQueue.main.async {
+                self.capturedGIFURL = url
+                self.isProcessingGIF = false
+                
+                if url != nil {
+                    print("✅ [CameraView] Segmented GIF generated successfully: \(url!)")
+                    self.showingSegmentation = true
+                } else {
+                    print("❌ [CameraView] GIF generation failed")
+                }
+            }
         }
     }
     

@@ -201,40 +201,47 @@ struct MagnetCard: View {
     
     var body: some View {
         VStack(spacing: 8) {
-            if let image = ImageManager.shared.loadImage(filename: magnet.imagePath) {
-                ZStack {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
+            ZStack {
+                if let gifPath = magnet.gifPath {
+                    GIFView(url: ImageManager.shared.getFileURL(for: gifPath))
                         .frame(height: 150)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-                    
-                    if let outline = outlineImage {
-                        Image(uiImage: outline)
+                } else if let image = ImageManager.shared.loadImage(filename: magnet.imagePath) {
+                    ZStack {
+                        Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(height: 150)
+                            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                        
+                        if let outline = outlineImage {
+                            Image(uiImage: outline)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(height: 150)
+                        }
                     }
-                }
-                .onAppear {
-                    if outlineImage == nil {
-                        DispatchQueue.global(qos: .userInitiated).async {
-                            let outline = ImageOutlineHelper.createOutline(from: image, lineWidth: 3, offset: 2)
-                            DispatchQueue.main.async {
-                                self.outlineImage = outline
+                    .onAppear {
+                        if outlineImage == nil {
+                            DispatchQueue.global(qos: .userInitiated).async {
+                                let outline = ImageOutlineHelper.createOutline(from: image, lineWidth: 3, offset: 2)
+                                DispatchQueue.main.async {
+                                    self.outlineImage = outline
+                                }
                             }
                         }
                     }
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 150)
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.gray)
+                        )
                 }
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 150)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .font(.largeTitle)
-                            .foregroundColor(.gray)
-                    )
             }
             
             Text(magnet.name)

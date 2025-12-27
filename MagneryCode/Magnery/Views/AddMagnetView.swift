@@ -7,6 +7,7 @@ struct AddMagnetView: View {
     
     let image: UIImage
     let originalImage: UIImage?  // Original image with EXIF data
+    let gifURL: URL?
     @State private var name: String = ""
     @State private var location: String = "未知位置"
     @State private var latitude: Double?
@@ -26,9 +27,10 @@ struct AddMagnetView: View {
         case notes
     }
     
-    init(image: UIImage, originalImage: UIImage? = nil) {
+    init(image: UIImage, originalImage: UIImage? = nil, gifURL: URL? = nil) {
         self.image = image
         self.originalImage = originalImage
+        self.gifURL = gifURL
     }
     
     var body: some View {
@@ -528,6 +530,11 @@ struct AddMagnetView: View {
             return
         }
         
+        var gifPath: String? = nil
+        if let gifURL = gifURL {
+            gifPath = ImageManager.shared.saveGIF(from: gifURL)
+        }
+        
         // If location is still "未知位置" or coordinates are nil, 
         // we ensure they are nil so they don't show up on the map
         let finalLat = (location == "未知位置" || latitude == nil) ? nil : latitude
@@ -540,6 +547,7 @@ struct AddMagnetView: View {
             latitude: finalLat,
             longitude: finalLon,
             imagePath: imagePath,
+            gifPath: gifPath,
             notes: notes
         )
         

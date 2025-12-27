@@ -101,6 +101,7 @@ struct CornerAccents: Shape {
 struct SegmentationView: View {
     @Environment(\.dismiss) var dismiss
     let originalImage: UIImage
+    let gifURL: URL?
     @State private var segmentedImage: UIImage?
     @State private var outlineImage: UIImage?
     @State private var isProcessing = true
@@ -127,8 +128,9 @@ struct SegmentationView: View {
         case complete
     }
     
-    init(originalImage: UIImage) {
+    init(originalImage: UIImage, gifURL: URL? = nil) {
         self.originalImage = originalImage
+        self.gifURL = gifURL
         _currentImage = State(initialValue: originalImage)
     }
     
@@ -477,7 +479,7 @@ struct SegmentationView: View {
         .fullScreenCover(isPresented: $showingAddView) {
             if let image = segmentedImage {
                 let squareImage = ImageOutlineHelper.padToSquare(image: image) ?? image
-                AddMagnetView(image: squareImage, originalImage: originalImage)
+                AddMagnetView(image: squareImage, originalImage: originalImage, gifURL: gifURL)
                     .onAppear {
                         print("🎨 [SegmentationView] Opening AddMagnetView")
                         print("🎨 [SegmentationView] Segmented image size: \(image.size)")
