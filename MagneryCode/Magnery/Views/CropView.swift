@@ -107,6 +107,7 @@ struct CropView: View {
                 .padding(.bottom, 15)
                 .background(.ultraThinMaterial.opacity(0.5))
                 .background(Color.black.opacity(0.4))
+                .zIndex(10) // Ensure top bar is always on top of the scaled image
                 
                 // Main Editing Area
                 GeometryReader { geometry in
@@ -361,6 +362,7 @@ struct CropView: View {
                 }
                 .background(.ultraThinMaterial.opacity(0.8))
                 .background(Color.black.opacity(0.6))
+                .zIndex(10) // Ensure bottom controls are always on top
                 .overlay(
                     Rectangle()
                         .fill(Color.white.opacity(0.05))
