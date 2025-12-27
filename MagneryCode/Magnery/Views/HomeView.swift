@@ -16,6 +16,8 @@ struct HomeView: View {
     @State private var lastScrollUpdate: CGFloat = 0
     @State private var homeMode: HomeMode = .camera
     @State private var hasTriggeredHaptic = false
+    @State private var selectedGroupForNavigation: MagnetGroup?
+    @State private var lastAddedIdForNavigation: UUID?
     
     private let collapsedThreshold: CGFloat = 200
     private let maxHeaderHeight: CGFloat = 360
@@ -81,6 +83,21 @@ struct HomeView: View {
             }
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraView()
+            }
+            .navigationDestination(item: $selectedGroupForNavigation) { group in
+                ListView(group: group, scrollToGroup: true, scrollToItemId: lastAddedIdForNavigation)
+            }
+            .onChange(of: store.lastAddedMagnetId) { oldValue, newValue in
+                if let newId = newValue {
+                    // Find the group this magnet belongs to
+                    let groups = store.groupedMagnets()
+                    if let group = groups.first(where: { g in g.items.contains(where: { $0.id == newId }) }) {
+                        lastAddedIdForNavigation = newId
+                        selectedGroupForNavigation = group
+                    }
+                    // Reset the ID in store so we don't trigger again
+                    store.lastAddedMagnetId = nil
+                }
             }
         }
     }

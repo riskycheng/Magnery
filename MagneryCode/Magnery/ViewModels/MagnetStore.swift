@@ -13,6 +13,7 @@ struct SectionData: Identifiable {
 class MagnetStore: ObservableObject {
     @Published var magnets: [MagnetItem] = []
     @Published var groupingMode: GroupingMode = .location
+    @Published var lastAddedMagnetId: UUID?
     
     // Cache for grouped sections to improve performance
     @Published var sections: [SectionData] = []
@@ -26,6 +27,7 @@ class MagnetStore: ObservableObject {
     
     func addMagnet(_ magnet: MagnetItem) {
         magnets.append(magnet)
+        lastAddedMagnetId = magnet.id
         saveMagnets()
         updateSections()
     }

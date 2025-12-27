@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-struct MagnetItem: Identifiable, Codable, Equatable {
+struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
     let id: UUID
     var name: String
     var date: Date
@@ -33,12 +33,24 @@ struct MagnetItem: Identifiable, Codable, Equatable {
     }
 }
 
-struct MagnetGroup: Identifiable {
+struct MagnetGroup: Identifiable, Hashable {
     var id: String { title }
     let title: String
     let subtitle: String
     let items: [MagnetItem]
     let color: Color
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(title)
+        hasher.combine(subtitle)
+        hasher.combine(items)
+    }
+
+    static func == (lhs: MagnetGroup, rhs: MagnetGroup) -> Bool {
+        lhs.title == rhs.title && 
+        lhs.subtitle == rhs.subtitle && 
+        lhs.items == rhs.items
+    }
 }
 
 enum GroupingMode {

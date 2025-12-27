@@ -173,35 +173,46 @@ struct DetailView: View {
                 .font(.headline)
                 .padding(.horizontal)
             
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(groupItems) { item in
-                        Button(action: {
-                            withAnimation {
-                                currentMagnet = item
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(groupItems) { item in
+                            Button(action: {
+                                withAnimation {
+                                    currentMagnet = item
+                                }
+                            }) {
+                                if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 60, height: 60)
+                                        .opacity(item.id == currentMagnet.id ? 1.0 : 0.5)
+                                        .scaleEffect(item.id == currentMagnet.id ? 1.3 : 0.9)
+                                        .shadow(
+                                            color: item.id == currentMagnet.id ? .blue.opacity(0.3) : .clear,
+                                            radius: item.id == currentMagnet.id ? 8 : 0,
+                                            x: 0,
+                                            y: 2
+                                        )
+                                }
                             }
-                        }) {
-                            if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 60, height: 60)
-                                    .opacity(item.id == currentMagnet.id ? 1.0 : 0.5)
-                                    .scaleEffect(item.id == currentMagnet.id ? 1.3 : 0.9)
-                                    .shadow(
-                                        color: item.id == currentMagnet.id ? .blue.opacity(0.3) : .clear,
-                                        radius: item.id == currentMagnet.id ? 8 : 0,
-                                        x: 0,
-                                        y: 2
-                                    )
-                            }
+                            .id(item.id)
                         }
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 10)
+                .frame(height: 100)
+                .onChange(of: currentMagnet.id) { oldValue, newValue in
+                    withAnimation {
+                        proxy.scrollTo(newValue, anchor: .center)
+                    }
+                }
+                .onAppear {
+                    proxy.scrollTo(currentMagnet.id, anchor: .center)
+                }
             }
-            .frame(height: 100)
         }
     }
     

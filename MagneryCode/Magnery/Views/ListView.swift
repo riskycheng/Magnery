@@ -4,14 +4,16 @@ struct ListView: View {
     @EnvironmentObject var store: MagnetStore
     let group: MagnetGroup?
     let scrollToGroup: Bool
+    let scrollToItemId: UUID?
     @State private var selectedItemId: UUID? = nil
     @State private var groups: [MagnetGroup] = []
     @State private var itemToShare: MagnetItem? = nil
     @Namespace private var scrollNamespace
     
-    init(group: MagnetGroup? = nil, scrollToGroup: Bool = false) {
+    init(group: MagnetGroup? = nil, scrollToGroup: Bool = false, scrollToItemId: UUID? = nil) {
         self.group = group
         self.scrollToGroup = scrollToGroup
+        self.scrollToItemId = scrollToItemId
     }
     
     var body: some View {
@@ -61,8 +63,14 @@ struct ListView: View {
             .onAppear {
                 if scrollToGroup, let targetGroup = group {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation {
-                            proxy.scrollTo(targetGroup.id, anchor: .top)
+                        if let itemId = scrollToItemId {
+                            withAnimation {
+                                proxy.scrollTo(itemId, anchor: .center)
+                            }
+                        } else {
+                            withAnimation {
+                                proxy.scrollTo(targetGroup.id, anchor: .top)
+                            }
                         }
                     }
                 }
@@ -77,6 +85,7 @@ struct ListView: View {
         ], spacing: 16) {
             ForEach(group.items.sorted { $0.date > $1.date }) { item in
                 magnetItemView(for: item)
+                    .id(item.id)
             }
         }
         .padding(.horizontal)
