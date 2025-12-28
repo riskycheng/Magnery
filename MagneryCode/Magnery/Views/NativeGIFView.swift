@@ -10,15 +10,17 @@ struct NativeGIFView: View {
     @State private var timer: Timer? = nil
     
     var body: some View {
-        Group {
+        ZStack {
             if let image = currentFrame {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .transition(.opacity.animation(.easeIn(duration: 0.4)))
             } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.1))
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.gray.opacity(0.12))
                     .shimmering()
+                    .transition(.opacity)
             }
         }
         .onAppear {

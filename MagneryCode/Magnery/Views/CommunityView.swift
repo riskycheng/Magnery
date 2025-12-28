@@ -63,49 +63,77 @@ struct CommunityView: View {
     }
     
     private var contentGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-            if communityService.isLoading && communityService.popularMagnets.isEmpty {
-                // Show skeletons while loading the first batch
-                ForEach(0..<6, id: \.self) { _ in
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 20) {
+            if communityService.popularMagnets.isEmpty && communityService.isLoading {
+                // Initial loading state: Show 6 skeletons
+                ForEach(0..<6, id: \.self) { index in
                     skeletonCard
+                        .transition(.opacity)
                 }
             } else {
+                // Content state: Show real cards
                 ForEach(communityService.popularMagnets) { magnet in
                     communityCard(magnet: magnet)
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                            removal: .opacity
+                        ))
                 }
                 
-                // If still loading more, show a few skeletons at the end
+                // If we are still loading more items
                 if communityService.isLoading {
                     ForEach(0..<2, id: \.self) { _ in
                         skeletonCard
+                            .pulsing()
                     }
                 }
             }
         }
-        .padding()
-        .padding(.bottom, 100)
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: communityService.popularMagnets.count)
+        .padding(.horizontal)
+        .padding(.bottom, 120)
     }
     
     private var skeletonCard: some View {
-        VStack(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white)
-                .frame(height: 180)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(LinearGradient(gradient: Gradient(colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.2), Color.gray.opacity(0.1)]), startPoint: .leading, endPoint: .trailing))
-                        .shimmering()
-                )
+        VStack(alignment: .leading, spacing: 12) {
+            // Image Placeholder with layered animation
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.gray.opacity(0.15))
+                
+                // High-end glass shimmer
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [.clear, .white.opacity(0.6), .clear]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shimmering()
+            }
+            .frame(height: 180)
             
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.gray.opacity(0.2))
-                .frame(width: 100, height: 14)
-                .padding(.top, 8)
-            
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.gray.opacity(0.1))
-                .frame(width: 60, height: 10)
-                .padding(.top, 4)
+            VStack(alignment: .leading, spacing: 8) {
+                // Title Placeholder
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.gray.opacity(0.15))
+                    .frame(width: 120, height: 18)
+                    .shimmering()
+                
+                // User Info Placeholder
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.gray.opacity(0.12))
+                        .frame(width: 20, height: 20)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(width: 60, height: 12)
+                }
+                .shimmering()
+            }
+            .padding(.horizontal, 4)
         }
     }
     
@@ -126,53 +154,89 @@ struct CommunityView: View {
     }
     
     private func communityCard(magnet: CommunityMagnet) -> some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+                // Persistent background to prevent layout shifts
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.gray.opacity(0.1))
+                    .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
                 
-                if let gifURL = magnet.gifURL {
-                    NativeGIFView(url: gifURL)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                } else if let imageURL = magnet.imageURL {
-                    AsyncImage(url: imageURL) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.gray.opacity(0.1))
-                            .shimmering()
+                Group {
+                    if let gifURL = magnet.gifURL {
+                        NativeGIFView(url: gifURL)
+                    } else if let imageURL = magnet.imageURL {
+                        AsyncImage(url: imageURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .transition(.opacity.animation(.easeInOut(duration: 0.6)))
+                            case .failure:
+                                Image(systemName: "photo.on.rectangle.angled")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.gray.opacity(0.2))
+                            case .empty:
+                                // The "Advanced" Image Placeholder
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 24)
+                                        .fill(Color.gray.opacity(0.15))
+                                    
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [.clear, .white.opacity(0.6), .clear]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                    .shimmering()
+                                }
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 24))
             }
             .frame(height: 180)
             
-            Text(magnet.name)
-                .font(.system(size: 14, weight: .semibold))
-                .lineLimit(1)
-                .padding(.top, 8)
-            
-            HStack {
-                Image(systemName: magnet.userAvatar)
-                    .font(.system(size: 12))
-                    .foregroundColor(.orange)
-                Text(magnet.userName)
-                    .font(.system(size: 12))
-                    .foregroundColor(.gray)
-                Spacer()
-                HStack(spacing: 2) {
-                    Image(systemName: "heart.fill")
+            // Fixed-height text container to prevent layout jumps
+            VStack(alignment: .leading, spacing: 8) {
+                Text(magnet.name)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .frame(height: 18) // Match skeleton height exactly
+                
+                HStack {
+                    Image(systemName: magnet.userAvatar)
                         .font(.system(size: 10))
-                        .foregroundColor(.red)
-                    Text("\(magnet.likes)")
-                        .font(.system(size: 10))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.orange)
+                        .frame(width: 20, height: 20) // Match skeleton circle exactly
+                        .background(Color.orange.opacity(0.1))
+                        .clipShape(Circle())
+                    
+                    Text(magnet.userName)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(height: 12) // Match skeleton height exactly
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 3) {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.red.opacity(0.8))
+                        Text("\(magnet.likes)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.gray.opacity(0.05))
+                    .clipShape(Capsule())
                 }
             }
-            .padding(.top, 2)
+            .padding(.horizontal, 4)
         }
     }
 }
