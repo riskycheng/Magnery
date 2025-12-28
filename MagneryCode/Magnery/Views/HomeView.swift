@@ -295,7 +295,7 @@ struct HomeView: View {
             }
         }
         .padding(.top, 8)
-        .padding(.bottom, 40)
+        .padding(.bottom, 100)
     }
     
     private var modeAndGroupingToggle: some View {

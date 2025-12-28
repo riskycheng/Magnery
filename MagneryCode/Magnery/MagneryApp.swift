@@ -13,7 +13,7 @@ struct MagneryApp: App {
     
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            MainTabView()
                 .environmentObject(store)
         }
     }
