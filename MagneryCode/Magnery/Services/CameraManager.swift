@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import Combine
+import CoreLocation
 
 class CameraManager: NSObject, ObservableObject {
     @Published var session = AVCaptureSession()

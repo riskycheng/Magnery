@@ -4,6 +4,7 @@ import CoreLocation
 struct AddMagnetView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var store: MagnetStore
+    @ObservedObject var locationManager = LocationManager.shared
     
     let image: UIImage
     let originalImage: UIImage?  // Original image with EXIF data
@@ -408,6 +409,12 @@ struct AddMagnetView: View {
                 print("👁️ [AddMagnetView] Has original image: \(originalImage != nil)")
                 extractEXIFData()
             }
+            .onChange(of: locationManager.location?.timestamp) { oldValue, newValue in
+                if latitude == nil, let _ = newValue {
+                    print("📍 [AddMagnetView] Location updated, retrying extraction...")
+                    getCurrentLocation()
+                }
+            }
         }
     }
     
@@ -437,7 +444,8 @@ struct AddMagnetView: View {
             if let coordinates = metadata.coordinates {
                 reverseGeocodeCoordinates(coordinates)
             } else {
-                print("⚠️ [AddMagnetView] No GPS coordinates found in file EXIF")
+                print("⚠️ [AddMagnetView] No GPS coordinates found in file EXIF, trying current location...")
+                getCurrentLocation()
             }
             
             // Clean up the cached file
@@ -584,25 +592,53 @@ struct AddMagnetView: View {
     
     private func getCurrentLocation() {
         isGettingLocation = true
-        let locationManager = CLLocationManager()
-        locationManager.requestWhenInUseAuthorization()
         
-        if let currentLocation = locationManager.location {
+        if let currentLocation = LocationManager.shared.location {
+            print("✅ [AddMagnetView] Using location from LocationManager: \(currentLocation.coordinate.latitude), \(currentLocation.coordinate.longitude)")
             self.latitude = currentLocation.coordinate.latitude
             self.longitude = currentLocation.coordinate.longitude
             let geocoder = CLGeocoder()
             geocoder.reverseGeocodeLocation(currentLocation) { placemarks, error in
                 if let placemark = placemarks?.first {
-                    if let city = placemark.locality, let district = placemark.subLocality {
-                        location = "\(city)\(district)"
-                    } else if let city = placemark.locality {
-                        location = city
+                    var locationComponents: [String] = []
+                    
+                    if let city = placemark.locality {
+                        locationComponents.append(city)
+                    }
+                    if let district = placemark.subLocality {
+                        locationComponents.append(district)
+                    }
+                    
+                    if !locationComponents.isEmpty {
+                        self.location = locationComponents.joined(separator: "")
+                        print("✅ [AddMagnetView] Set location to: \(self.location)")
                     }
                 }
                 isGettingLocation = false
             }
         } else {
-            isGettingLocation = false
+            print("⚠️ [AddMagnetView] LocationManager has no location, requesting one-time update...")
+            LocationManager.shared.requestLocation()
+            
+            // Fallback to the old way just in case
+            let locationManager = CLLocationManager()
+            if let currentLocation = locationManager.location {
+                self.latitude = currentLocation.coordinate.latitude
+                self.longitude = currentLocation.coordinate.longitude
+                let geocoder = CLGeocoder()
+                geocoder.reverseGeocodeLocation(currentLocation) { placemarks, error in
+                    if let placemark = placemarks?.first {
+                        if let city = placemark.locality, let district = placemark.subLocality {
+                            location = "\(city)\(district)"
+                        } else if let city = placemark.locality {
+                            location = city
+                        }
+                    }
+                    isGettingLocation = false
+                }
+            } else {
+                isGettingLocation = false
+            }
         }
     }
     

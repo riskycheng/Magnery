@@ -296,9 +296,12 @@ struct CameraView: View {
             cameraManager.capturedImage = nil
             capturedGIFURL = nil
             cameraManager.startSession()
+            LocationManager.shared.requestAuthorization()
+            LocationManager.shared.startUpdatingLocation()
         }
         .onDisappear {
             cameraManager.stopSession()
+            LocationManager.shared.stopUpdatingLocation()
         }
     }
     
