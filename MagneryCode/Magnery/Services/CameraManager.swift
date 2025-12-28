@@ -186,6 +186,70 @@ class CameraManager: NSObject, ObservableObject {
             }
         }
     }
+
+    func processVideo(at url: URL) {
+        DispatchQueue.main.async {
+            self.isProcessingFrames = true
+            self.processingProgress = 0
+            self.capturedFrames = []
+            self.segmentedFrames = []
+            self.processedResults = [:]
+            self.totalCapturedCount = 0
+        }
+
+        processingQueue.async {
+            let asset = AVAsset(url: url)
+            let reader: AVAssetReader
+            do {
+                reader = try AVAssetReader(asset: asset)
+            } catch {
+                print("❌ [CameraManager] Failed to create AVAssetReader: \(error)")
+                DispatchQueue.main.async { self.isProcessingFrames = false }
+                return
+            }
+
+            guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+                print("❌ [CameraManager] No video track found")
+                DispatchQueue.main.async { self.isProcessingFrames = false }
+                return
+            }
+
+            let outputSettings: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            ]
+            let output = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: outputSettings)
+            reader.add(output)
+            reader.startReading()
+
+            var frames: [UIImage] = []
+            var frameIndex = 0
+            let frameSkip = 3 // Same as real-time capture
+
+            while let sampleBuffer = output.copyNextSampleBuffer() {
+                if frameIndex % frameSkip == 0 {
+                    if let image = self.imageFromSampleBuffer(sampleBuffer) {
+                        frames.append(image)
+                    }
+                }
+                frameIndex += 1
+                if frames.count >= self.maxFrames { break }
+            }
+
+            DispatchQueue.main.async {
+                self.totalCapturedCount = frames.count
+                self.capturedFrames = frames
+                
+                if frames.isEmpty {
+                    self.isProcessingFrames = false
+                    return
+                }
+
+                for (index, image) in frames.enumerated() {
+                    self.processFrameInBackground(image: image, index: index)
+                }
+            }
+        }
+    }
 }
 
 extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {

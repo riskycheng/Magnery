@@ -79,6 +79,7 @@ struct CameraView: View {
     @State private var showingSegmentation = false
     @State private var isProcessingGIF = false
     @State private var capturedGIFURL: URL?
+    @State private var selectedVideoURL: URL?
     
     var body: some View {
         ZStack {
@@ -268,7 +269,14 @@ struct CameraView: View {
             }
         }
         .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(image: $cameraManager.capturedImage, sourceType: .photoLibrary)
+            ImagePicker(image: $cameraManager.capturedImage, videoURL: $selectedVideoURL, sourceType: .photoLibrary)
+        }
+        .onChange(of: selectedVideoURL) { oldValue, newValue in
+            if let url = newValue {
+                cameraManager.stopSession()
+                cameraManager.processVideo(at: url)
+                selectedVideoURL = nil
+            }
         }
         .onChange(of: cameraManager.capturedImage) { oldValue, newValue in
             if newValue != nil {
@@ -338,6 +346,7 @@ struct CameraView: View {
 
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var image: UIImage?
+    var videoURL: Binding<URL?>? = nil
     let sourceType: UIImagePickerController.SourceType
     @Environment(\.dismiss) var dismiss
     
@@ -345,7 +354,7 @@ struct ImagePicker: UIViewControllerRepresentable {
         // Use PHPickerViewController for photo library (modern API with better metadata support)
         if sourceType == .photoLibrary {
             var configuration = PHPickerConfiguration(photoLibrary: .shared())
-            configuration.filter = .images
+            configuration.filter = .any(of: [.images, .videos])
             configuration.selectionLimit = 1
             configuration.preferredAssetRepresentationMode = .current  // Get the current version with edits
             
@@ -435,6 +444,28 @@ struct ImagePicker: UIViewControllerRepresentable {
             print("📂 [PHPicker] Loading file representation to preserve EXIF...")
             
             let itemProvider = result.itemProvider
+            
+            if itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                print("🎬 [PHPicker] Video selected")
+                itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, error in
+                    if let error = error {
+                        print("❌ [PHPicker] Error loading video: \(error.localizedDescription)")
+                        return
+                    }
+                    
+                    if let url = url {
+                        // Copy to temp location because the original URL is temporary and will be deleted
+                        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+                        try? FileManager.default.copyItem(at: url, to: tempURL)
+                        
+                        DispatchQueue.main.async {
+                            self.parent.videoURL?.wrappedValue = tempURL
+                            self.parent.dismiss()
+                        }
+                    }
+                }
+                return
+            }
             
             // Check if we can load as an image
             if itemProvider.canLoadObject(ofClass: UIImage.self) {
