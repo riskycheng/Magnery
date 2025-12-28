@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "magnet_icon8.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -12,6 +13,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "magnet_icon8 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -23,6 +25,7 @@
           "value" : "tinted"
         }
       ],
+      "filename" : "magnet_icon8 2.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
