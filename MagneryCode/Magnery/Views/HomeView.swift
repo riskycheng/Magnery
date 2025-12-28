@@ -443,7 +443,7 @@ struct GroupCard: View {
                     ForEach(group.items.prefix(12)) { item in
                         ZStack {
                             if let gifPath = item.gifPath {
-                                GIFView(url: ImageManager.shared.getFileURL(for: gifPath))
+                                NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
                                     .frame(width: 72, height: 72)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             } else if let image = ImageManager.shared.loadImage(filename: item.imagePath) {

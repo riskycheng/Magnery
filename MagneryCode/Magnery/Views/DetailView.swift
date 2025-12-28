@@ -40,7 +40,7 @@ struct DetailView: View {
                     Spacer()
                     
                     if let gifPath = currentMagnet.gifPath {
-                        GIFView(url: ImageManager.shared.getFileURL(for: gifPath))
+                        NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
                             .frame(maxHeight: 350)
                             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
                             .padding(.horizontal, 40)

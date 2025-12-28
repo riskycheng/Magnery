@@ -64,6 +64,8 @@ struct MainTabView: View {
                 
                 // Liquid Selection Indicator
                 Canvas { context, size in
+                    guard size.width > 0 && size.height > 0 else { return }
+                    
                     context.addFilter(.blur(radius: 15))
                     context.addFilter(.alphaThreshold(min: 0.5, color: Color.black.opacity(0.18)))
                     
@@ -97,6 +99,7 @@ struct MainTabView: View {
                 }
                 .frame(width: barWidth, height: barHeight)
                 .clipShape(Capsule()) // Ensure liquid effect doesn't exceed rounded corners
+                .drawingGroup() // Offload complex liquid filters to GPU
                 
                 // Tab Buttons
                 HStack(spacing: 0) {

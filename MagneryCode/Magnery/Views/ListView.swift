@@ -212,7 +212,7 @@ struct MagnetCard: View {
         VStack(spacing: 8) {
             ZStack {
                 if let gifPath = magnet.gifPath {
-                    GIFView(url: ImageManager.shared.getFileURL(for: gifPath))
+                    NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
                         .frame(height: 150)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
