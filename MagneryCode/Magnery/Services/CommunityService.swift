@@ -1,6 +1,15 @@
 import Foundation
 import Combine
 
+struct CommunityConfig {
+    // Change this to switch between different hosting environments
+    static let baseURL = "http://t81751iws.hn-bkt.clouddn.com/magnets_resources/"
+    
+    // Examples:
+    // static let baseURL = "https://gitee.com/riskycheng/magnery-res/raw/master/"
+    // static let baseURL = "https://riskycheng.gitee.io/magnery-res/" // Gitee Pages
+}
+
 struct CommunityMagnet: Identifiable, Codable {
     let id: String
     let name: String
@@ -13,15 +22,58 @@ struct CommunityMagnet: Identifiable, Codable {
     var likes: Int
     let imageName: String
     let gifName: String?
+    let modelName: String?
     let date: Date
     
     var imageURL: URL? {
-        URL(string: "https://gitee.com/riskycheng/magnery-res/raw/master/\(imageName)")
+        let base = CommunityConfig.baseURL
+        let name = imageName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fullString = name.hasPrefix("http") ? name : base + name
+        
+        // Only encode if it's not already a valid URL
+        if let url = URL(string: fullString) {
+            return url
+        }
+        
+        // If it fails, try encoding only the characters that are definitely illegal in a URL
+        return URL(string: fullString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fullString)
     }
     
     var gifURL: URL? {
-        guard let gifName = gifName else { return nil }
-        return URL(string: "https://gitee.com/riskycheng/magnery-res/raw/master/\(gifName)")
+        guard let gifName = gifName?.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        let base = CommunityConfig.baseURL
+        let fullString = gifName.hasPrefix("http") ? gifName : base + gifName
+        
+        if let url = URL(string: fullString) {
+            return url
+        }
+        return URL(string: fullString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fullString)
+    }
+
+    var modelURL: URL? {
+        guard let modelName = modelName?.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        let base = CommunityConfig.baseURL
+        let fullString = modelName.hasPrefix("http") ? modelName : base + modelName
+        
+        if let url = URL(string: fullString) {
+            return url
+        }
+        return URL(string: fullString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fullString)
+    }
+    
+    func toMagnetItem() -> MagnetItem {
+        MagnetItem(
+            id: UUID(),
+            name: name,
+            date: date,
+            location: location,
+            latitude: latitude,
+            longitude: longitude,
+            imagePath: imageURL?.absoluteString ?? "",
+            gifPath: gifURL?.absoluteString,
+            modelPath: modelURL?.absoluteString,
+            notes: notes
+        )
     }
 }
 
@@ -34,14 +86,12 @@ class CommunityService: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    private let baseURL = "https://gitee.com/riskycheng/magnery-res/raw/master/"
-    
     func fetchCommunityContent() {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
         
-        guard let manifestURL = URL(string: baseURL + "manifest.json") else {
+        guard let manifestURL = URL(string: CommunityConfig.baseURL + "manifest.json") else {
             print("❌ [CommunityService] Invalid manifest URL")
             self.errorMessage = "无效的 URL"
             self.isLoading = false
@@ -50,7 +100,12 @@ class CommunityService: ObservableObject {
         
         print("🌐 [CommunityService] Fetching manifest from: \(manifestURL.absoluteString)")
         
-        URLSession.shared.dataTask(with: manifestURL) { [weak self] data, response, error in
+        var request = URLRequest(url: manifestURL)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 30
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             if let error = error {
                 print("❌ [CommunityService] Manifest fetch error: \(error.localizedDescription)")
                 DispatchQueue.main.async {
@@ -110,13 +165,18 @@ class CommunityService: ObservableObject {
         
         for name in names {
             group.enter()
-            guard let url = URL(string: baseURL + name) else {
+            guard let url = URL(string: CommunityConfig.baseURL + name) else {
                 print("⚠️ [CommunityService] Invalid URL for item: \(name)")
                 group.leave()
                 continue
             }
             
-            URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.timeoutInterval = 30
+            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+            
+            URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
                 defer { group.leave() }
                 
                 if let error = error {

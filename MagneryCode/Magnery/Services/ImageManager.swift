@@ -65,6 +65,9 @@ class ImageManager {
     }
     
     func getFileURL(for filename: String) -> URL {
+        if filename.hasPrefix("http") {
+            return URL(string: filename) ?? getDocumentsDirectory().appendingPathComponent(filename)
+        }
         return getDocumentsDirectory().appendingPathComponent(filename)
     }
 

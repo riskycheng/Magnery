@@ -4,6 +4,7 @@ struct CommunityView: View {
     @EnvironmentObject var store: MagnetStore
     @StateObject private var communityService = CommunityService()
     @State private var isContentVisible = false
+    @State private var selectedMagnet: MagnetItem?
     
     var body: some View {
         NavigationStack {
@@ -28,23 +29,36 @@ struct CommunityView: View {
                     }
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
+                
+                // Central loading indicator for the very first fetch
+                if communityService.isLoading && communityService.popularMagnets.isEmpty {
+                    VStack(spacing: 15) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("正在探索社区...")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(red: 0.95, green: 0.95, blue: 0.97).opacity(0.8))
+                    .transition(.opacity)
+                }
             }
             .setTabBarVisibility(true)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(item: $selectedMagnet) { magnet in
+                DetailView(magnet: magnet)
+            }
             .onAppear {
-                // 1. First, make the container visible with a slight delay to avoid transition stutter
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        isContentVisible = true
-                    }
+                // 1. First, make the container visible
+                withAnimation(.easeOut(duration: 0.3)) {
+                    isContentVisible = true
                 }
                 
-                // 2. Then, trigger the fetch after the content has started appearing
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if communityService.popularMagnets.isEmpty {
-                        print("📱 [CommunityView] Delayed fetch triggered")
-                        communityService.fetchCommunityContent()
-                    }
+                // 2. Trigger the fetch immediately
+                if communityService.popularMagnets.isEmpty {
+                    print("📱 [CommunityView] Immediate fetch triggered")
+                    communityService.fetchCommunityContent()
                 }
             }
         }
@@ -52,8 +66,15 @@ struct CommunityView: View {
     
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("社区精选")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+            HStack(alignment: .firstTextBaseline) {
+                Text("社区精选")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                
+                if communityService.isLoading {
+                    ProgressView()
+                        .padding(.leading, 8)
+                }
+            }
             
             Text("探索来自全球收藏家的精致冰箱贴")
                 .font(.subheadline)
@@ -74,11 +95,18 @@ struct CommunityView: View {
             } else {
                 // Content state: Show real cards
                 ForEach(communityService.popularMagnets) { magnet in
-                    communityCard(magnet: magnet)
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.95)),
-                            removal: .opacity
-                        ))
+                    Button {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            selectedMagnet = magnet.toMagnetItem()
+                        }
+                    } label: {
+                        communityCard(magnet: magnet)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.95)),
+                        removal: .opacity
+                    ))
                 }
                 
                 // If we are still loading more items
@@ -163,37 +191,28 @@ struct CommunityView: View {
                     .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
                 
                 Group {
-                    if let gifURL = magnet.gifURL {
+                    if let modelURL = magnet.modelURL {
+                        ZStack(alignment: .topTrailing) {
+                            // Show a 3D preview if possible, or just the image with a 3D badge
+                            if let imageURL = magnet.imageURL {
+                                CachedAsyncImage(url: imageURL)
+                                    .aspectRatio(contentMode: .fill)
+                            }
+                            
+                            Image(systemName: "arkit")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(6)
+                                .background(Color.blue.opacity(0.8))
+                                .clipShape(Circle())
+                                .padding(10)
+                        }
+                    } else if let gifURL = magnet.gifURL {
                         NativeGIFView(url: gifURL)
                     } else if let imageURL = magnet.imageURL {
-                        AsyncImage(url: imageURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .transition(.opacity.animation(.easeInOut(duration: 0.6)))
-                            case .failure:
-                                Image(systemName: "photo.on.rectangle.angled")
-                                    .font(.system(size: 30))
-                                    .foregroundColor(.gray.opacity(0.2))
-                            case .empty:
-                                // The "Advanced" Image Placeholder
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 24)
-                                        .fill(Color.gray.opacity(0.15))
-                                    
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [.clear, .white.opacity(0.6), .clear]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                    .shimmering()
-                                }
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
+                        CachedAsyncImage(url: imageURL)
+                            .aspectRatio(contentMode: .fill)
+                            .transition(.opacity.animation(.easeInOut(duration: 0.6)))
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 24))

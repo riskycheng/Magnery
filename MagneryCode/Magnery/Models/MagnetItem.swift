@@ -10,17 +10,22 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
     var longitude: Double?
     var imagePath: String
     var gifPath: String?
+    var modelPath: String?
     var notes: String
     
     var isGIF: Bool {
         gifPath != nil
+    }
+
+    var is3D: Bool {
+        modelPath != nil
     }
     
     var hasValidCoordinates: Bool {
         latitude != nil && longitude != nil
     }
     
-    init(id: UUID = UUID(), name: String, date: Date = Date(), location: String = "未知位置", latitude: Double? = nil, longitude: Double? = nil, imagePath: String, gifPath: String? = nil, notes: String = "") {
+    init(id: UUID = UUID(), name: String, date: Date = Date(), location: String = "未知位置", latitude: Double? = nil, longitude: Double? = nil, imagePath: String, gifPath: String? = nil, modelPath: String? = nil, notes: String = "") {
         self.id = id
         self.name = name
         self.date = date
@@ -29,6 +34,7 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
         self.longitude = longitude
         self.imagePath = imagePath
         self.gifPath = gifPath
+        self.modelPath = modelPath
         self.notes = notes
     }
 }

@@ -40,7 +40,20 @@ struct DetailView: View {
                     
                     Spacer()
                     
-                    if let gifPath = currentMagnet.gifPath {
+                    if let modelPath = currentMagnet.modelPath {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color.clear)
+                            
+                            Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
+                        }
+                        .frame(height: 350)
+                        .padding(.horizontal, 20)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                    } else if let gifPath = currentMagnet.gifPath {
                         NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
                             .frame(maxHeight: 350)
                             .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
@@ -55,23 +68,31 @@ struct DetailView: View {
                                         handleSwipeGesture(translation: value.translation)
                                     }
                             )
-                    } else if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 350)
-                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-                            .padding(.horizontal, 40)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                removal: .scale(scale: 0.8).combined(with: .opacity)
-                            ))
-                            .gesture(
-                                DragGesture(minimumDistance: 30)
-                                    .onEnded { value in
-                                        handleSwipeGesture(translation: value.translation)
-                                    }
-                            )
+                    } else {
+                        // Handle both local and remote images
+                        Group {
+                            if currentMagnet.imagePath.hasPrefix("http") {
+                                CachedAsyncImage(url: URL(string: currentMagnet.imagePath))
+                                    .aspectRatio(contentMode: .fit)
+                            } else if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            }
+                        }
+                        .frame(maxHeight: 350)
+                        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+                        .padding(.horizontal, 40)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                        .gesture(
+                            DragGesture(minimumDistance: 30)
+                                .onEnded { value in
+                                    handleSwipeGesture(translation: value.translation)
+                                }
+                        )
                     }
                     
                     VStack(spacing: 8) {
@@ -153,8 +174,8 @@ struct DetailView: View {
             if showingEditMenu && ellipsisButtonFrame != .zero {
                 circularMenuButtons
                     .position(
-                        x: ellipsisButtonFrame.midX - 30,
-                        y: ellipsisButtonFrame.midY + 115
+                        x: ellipsisButtonFrame.midX - 25,
+                        y: ellipsisButtonFrame.midY + 105
                     )
                     .zIndex(999)
             }
@@ -202,20 +223,31 @@ struct DetailView: View {
                                     currentMagnet = item
                                 }
                             }) {
-                                if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
-                                    Image(uiImage: image)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: 60, height: 60)
-                                        .opacity(item.id == currentMagnet.id ? 1.0 : 0.5)
-                                        .scaleEffect(item.id == currentMagnet.id ? 1.3 : 0.9)
-                                        .shadow(
-                                            color: item.id == currentMagnet.id ? .blue.opacity(0.3) : .clear,
-                                            radius: item.id == currentMagnet.id ? 8 : 0,
-                                            x: 0,
-                                            y: 2
-                                        )
+                                Group {
+                                    if item.imagePath.hasPrefix("http") {
+                                        AsyncImage(url: URL(string: item.imagePath)) { phase in
+                                            if case .success(let image) = phase {
+                                                image.resizable()
+                                                    .aspectRatio(contentMode: .fit)
+                                            } else {
+                                                Color.gray.opacity(0.1)
+                                            }
+                                        }
+                                    } else if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                    }
                                 }
+                                .frame(width: 60, height: 60)
+                                .opacity(item.id == currentMagnet.id ? 1.0 : 0.5)
+                                .scaleEffect(item.id == currentMagnet.id ? 1.3 : 0.9)
+                                .shadow(
+                                    color: item.id == currentMagnet.id ? .blue.opacity(0.3) : .clear,
+                                    radius: item.id == currentMagnet.id ? 8 : 0,
+                                    x: 0,
+                                    y: 2
+                                )
                             }
                             .id(item.id)
                         }
