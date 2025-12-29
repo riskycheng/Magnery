@@ -47,6 +47,7 @@ struct PersonalView: View {
                     }
                 }
             }
+            .setTabBarVisibility(true)
             .navigationTitle("个人中心")
             .navigationBarTitleDisplayMode(.inline)
         }

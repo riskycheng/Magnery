@@ -29,6 +29,7 @@ struct CommunityView: View {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
+            .setTabBarVisibility(true)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 // 1. First, make the container visible with a slight delay to avoid transition stutter

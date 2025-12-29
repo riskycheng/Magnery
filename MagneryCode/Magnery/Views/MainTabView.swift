@@ -26,6 +26,7 @@ struct MainTabView: View {
     @State private var selectedTab: Tab = .home
     @State private var dragOffset: CGFloat? = nil
     @State private var hoverTab: Tab? = nil
+    @State private var isTabBarVisible: Bool = true
     @EnvironmentObject var store: MagnetStore
     
     var body: some View {
@@ -45,9 +46,17 @@ struct MainTabView: View {
             .ignoresSafeArea()
             
             // Floating Tab Bar
-            floatingTabBar
+            if isTabBarVisible {
+                floatingTabBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .background(Color(red: 0.95, green: 0.95, blue: 0.97).ignoresSafeArea())
+        .onPreferenceChange(TabBarVisibilityPreferenceKey.self) { visible in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isTabBarVisible = visible
+            }
+        }
     }
     
     private var floatingTabBar: some View {

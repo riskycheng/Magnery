@@ -19,6 +19,7 @@ struct DetailView: View {
     @State private var ellipsisButtonFrame: CGRect = .zero
     @State private var refreshTrigger: Bool = false
     @State private var showingDeleteConfirmation = false
+    @State private var itemToShare: MagnetItem? = nil
     
     init(magnet: MagnetItem) {
         self.magnet = magnet
@@ -113,7 +114,9 @@ struct DetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        showingEditMenu.toggle()
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            showingEditMenu.toggle()
+                        }
                     }) {
                         Image(systemName: "ellipsis")
                             .foregroundColor(.primary)
@@ -123,7 +126,7 @@ struct DetailView: View {
                                     Color.clear
                                         .preference(
                                             key: EllipsisButtonBoundsKey.self,
-                                            value: geo.frame(in: .global).midX > 0 ? geo.frame(in: .global) : nil
+                                            value: geo.frame(in: .named("detail_root")).midX > 0 ? geo.frame(in: .named("detail_root")) : nil
                                         )
                                 }
                             )
@@ -136,18 +139,34 @@ struct DetailView: View {
                 }
             }
             
+            // Dimmed background when menu is showing
+            if showingEditMenu {
+                Color.black.opacity(0.01)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation {
+                            showingEditMenu = false
+                        }
+                    }
+            }
+            
             if showingEditMenu && ellipsisButtonFrame != .zero {
                 circularMenuButtons
                     .position(
-                        x: ellipsisButtonFrame.midX,
-                        y: ellipsisButtonFrame.midY - 20
+                        x: ellipsisButtonFrame.midX - 30,
+                        y: ellipsisButtonFrame.midY + 115
                     )
                     .zIndex(999)
             }
         }
+        .coordinateSpace(name: "detail_root")
+        .setTabBarVisibility(false)
         .toolbar(.hidden, for: .tabBar)
         .onAppear {
             loadGroupItems()
+        }
+        .sheet(item: $itemToShare) { item in
+            SharePreviewView(item: item)
         }
         .sheet(isPresented: $showingAIDialog) {
             AIDialogView(magnet: currentMagnet)
@@ -218,60 +237,55 @@ struct DetailView: View {
     }
     
     private var circularMenuButtons: some View {
-        let buttonSize: CGFloat = 56
-        // Calculate spacing relative to button size for consistency across devices
-        // Edit button: positioned to the left with slight upward offset
-        let editHorizontalOffset: CGFloat = buttonSize * 1.07  // ~60pt for 56pt button
-        let editVerticalOffset: CGFloat = -buttonSize * 1.07   // ~-60pt for 56pt button
-        // Delete button: positioned below with slight downward offset
-        let deleteVerticalOffset: CGFloat = -buttonSize * 0.36 // ~-20pt for 56pt button
+        let buttonSize: CGFloat = 50
+        let spacing: CGFloat = 12
         
-        return ZStack {
-            // edit_circle_btn: positioned upper-left relative to menu_button
+        return VStack(spacing: spacing) {
+            // Share Button
+            Button(action: {
+                showingEditMenu = false
+                itemToShare = currentMagnet
+            }) {
+                menuButtonOverlay(icon: "square.and.arrow.up.fill", color: .blue, size: buttonSize)
+            }
+            .transition(.scale.combined(with: .opacity))
+            
+            // Edit Button
             Button(action: {
                 showingEditMenu = false
                 showingEditSheet = true
             }) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: buttonSize, height: buttonSize)
-                        .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 5)
-                    
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.blue)
-                        .symbolRenderingMode(.hierarchical)
-                }
-                .contentShape(Circle())
+                menuButtonOverlay(icon: "pencil.circle.fill", color: .orange, size: buttonSize)
             }
-            .offset(x: -editHorizontalOffset, y: editVerticalOffset)
-            .scaleEffect(showingEditMenu ? 1 : 0.1)
-            .opacity(showingEditMenu ? 1 : 0)
+            .transition(.scale.combined(with: .opacity))
             
-            // delete_circle_btn: positioned below menu_button
+            // Delete Button
             Button(action: {
                 showingEditMenu = false
                 showingDeleteConfirmation = true
             }) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: buttonSize, height: buttonSize)
-                        .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 5)
-                    
-                    Image(systemName: "trash.circle.fill")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.red)
-                        .symbolRenderingMode(.hierarchical)
-                }
-                .contentShape(Circle())
+                menuButtonOverlay(icon: "trash.circle.fill", color: .red, size: buttonSize)
             }
-            .offset(x: 0, y: deleteVerticalOffset)
-            .scaleEffect(showingEditMenu ? 1 : 0.1)
-            .opacity(showingEditMenu ? 1 : 0)
+            .transition(.scale.combined(with: .opacity))
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: showingEditMenu)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 30)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.15), radius: 15, x: 0, y: 5)
+        )
+    }
+    
+    private func menuButtonOverlay(icon: String, color: Color, size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.1))
+                .frame(width: size, height: size)
+            
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(color)
+        }
     }
     
     private var groupTitle: String {
