@@ -145,6 +145,7 @@ struct DetailView: View {
                     .zIndex(999)
             }
         }
+        .toolbar(.hidden, for: .tabBar)
         .onAppear {
             loadGroupItems()
         }
