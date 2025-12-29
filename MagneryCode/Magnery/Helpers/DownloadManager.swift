@@ -10,9 +10,11 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     private var continuation: CheckedContinuation<URL, Error>?
     
     func download(url: URL, to destinationURL: URL) async throws -> URL {
-        isDownloading = true
-        progress = 0
-        error = nil
+        await MainActor.run {
+            isDownloading = true
+            progress = 0
+            error = nil
+        }
         
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
@@ -24,26 +26,58 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         if totalBytesExpectedToWrite > 0 {
+            let newProgress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
             DispatchQueue.main.async {
-                self.progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+                self.progress = newProgress
             }
         }
     }
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        isDownloading = false
-        DispatchQueue.main.async {
-            self.progress = 1.0
+        let response = downloadTask.response as? HTTPURLResponse
+        let statusCode = response?.statusCode ?? 0
+        
+        // Copy the file immediately on the background thread because 'location' is temporary
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        do {
+            try FileManager.default.moveItem(at: location, to: tempURL)
+        } catch {
+            print("❌ [DownloadManager] Failed to move temp file: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                self.isDownloading = false
+                self.continuation?.resume(throwing: error)
+                self.continuation = nil
+            }
+            return
         }
-        continuation?.resume(returning: location)
-        continuation = nil
+        
+        DispatchQueue.main.async {
+            self.isDownloading = false
+            self.progress = 1.0
+            
+            if statusCode != 200 {
+                print("❌ [DownloadManager] HTTP Error: \(statusCode) for \(downloadTask.originalRequest?.url?.lastPathComponent ?? "unknown")")
+                self.continuation?.resume(throwing: NSError(domain: "DownloadError", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP Error \(statusCode)"]))
+            } else {
+                self.continuation?.resume(returning: tempURL)
+            }
+            self.continuation = nil
+        }
     }
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        isDownloading = false
-        if let error = error {
-            continuation?.resume(throwing: error)
-            continuation = nil
+        DispatchQueue.main.async {
+            self.isDownloading = false
+            if let error = error {
+                print("❌ [DownloadManager] Task completed with error: \(error.localizedDescription)")
+                self.continuation?.resume(throwing: error)
+                self.continuation = nil
+            } else if self.continuation != nil {
+                // If didFinishDownloadingTo was never called but task finished without error
+                print("❌ [DownloadManager] Task completed unexpectedly without error or file")
+                self.continuation?.resume(throwing: NSError(domain: "DownloadError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Download failed unexpectedly"]))
+                self.continuation = nil
+            }
         }
     }
 }

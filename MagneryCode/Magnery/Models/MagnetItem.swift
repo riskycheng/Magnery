@@ -25,6 +25,54 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
         latitude != nil && longitude != nil
     }
     
+    var imageFallbackURLs: [URL] {
+        guard imagePath.hasPrefix("http") else { return [] }
+        
+        // Extract base URL from imagePath if possible
+        let baseURL: String
+        if let url = URL(string: imagePath) {
+            baseURL = url.deletingLastPathComponent().absoluteString + "/"
+        } else {
+            baseURL = "http://t81751iws.hn-bkt.clouddn.com/magnets_resources/"
+        }
+        
+        var urls: [URL] = []
+        let extensions = ["jpg", "JPG", "png", "PNG", "jpeg", "JPEG"]
+        
+        // 1. Try variations of the imagePath base name
+        let imageBaseName = (imagePath as NSString).lastPathComponent.components(separatedBy: ".").first ?? ""
+        if !imageBaseName.isEmpty {
+            for ext in extensions {
+                let fallbackURLString = baseURL + imageBaseName + "." + ext
+                if let url = URL(string: fallbackURLString), url.absoluteString != imagePath {
+                    if !urls.contains(url) {
+                        urls.append(url)
+                    }
+                }
+            }
+        }
+        
+        // 2. Try variations of the modelPath base name
+        if let modelPath = modelPath, !modelPath.isEmpty {
+            let modelBaseName = (modelPath as NSString).lastPathComponent.components(separatedBy: ".").first ?? ""
+            if !modelBaseName.isEmpty {
+                for ext in extensions {
+                    let fallbackURLString = baseURL + modelBaseName + "." + ext
+                    if let url = URL(string: fallbackURLString), url.absoluteString != imagePath {
+                        if !urls.contains(url) {
+                            urls.append(url)
+                        }
+                    }
+                }
+            }
+        }
+        return urls
+    }
+    
+    var imageURL: URL? {
+        URL(string: imagePath)
+    }
+    
     init(id: UUID = UUID(), name: String, date: Date = Date(), location: String = "未知位置", latitude: Double? = nil, longitude: Double? = nil, imagePath: String, gifPath: String? = nil, modelPath: String? = nil, notes: String = "") {
         self.id = id
         self.name = name

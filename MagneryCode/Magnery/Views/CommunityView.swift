@@ -191,28 +191,31 @@ struct CommunityView: View {
                     .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
                 
                 Group {
-                    if let modelURL = magnet.modelURL {
-                        ZStack(alignment: .topTrailing) {
-                            // Show a 3D preview if possible, or just the image with a 3D badge
-                            if let imageURL = magnet.imageURL {
-                                CachedAsyncImage(url: imageURL)
-                                    .aspectRatio(contentMode: .fill)
-                            }
-                            
+                    // Always show the cover image in the list view
+                    ZStack(alignment: .topTrailing) {
+                        CachedAsyncImage(url: magnet.imageURL, fallbackURLs: magnet.imageFallbackURLs)
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                        
+                        // Add badges for special types
+                        if magnet.modelName != nil {
                             Image(systemName: "arkit")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(6)
                                 .background(Color.blue.opacity(0.8))
                                 .clipShape(Circle())
-                                .padding(10)
+                                .padding(8)
+                        } else if magnet.gifName != nil {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(6)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Circle())
+                                .padding(8)
                         }
-                    } else if let gifURL = magnet.gifURL {
-                        NativeGIFView(url: gifURL)
-                    } else if let imageURL = magnet.imageURL {
-                        CachedAsyncImage(url: imageURL)
-                            .aspectRatio(contentMode: .fill)
-                            .transition(.opacity.animation(.easeInOut(duration: 0.6)))
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 24))

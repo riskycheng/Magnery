@@ -1,10 +1,18 @@
 import SwiftUI
 
+@MainActor
 struct CachedAsyncImage: View {
     let url: URL?
+    let fallbackURLs: [URL]
     @StateObject private var downloadManager = DownloadManager()
     @State private var image: UIImage?
     @State private var hasError = false
+    @State private var currentURLIndex = -1 // -1 means primary URL, 0+ means fallback index
+    
+    init(url: URL?, fallbackURLs: [URL] = []) {
+        self.url = url
+        self.fallbackURLs = fallbackURLs
+    }
     
     var body: some View {
         Group {
@@ -20,6 +28,16 @@ struct CachedAsyncImage: View {
                         Text("加载失败")
                             .font(.system(size: 8))
                             .foregroundColor(.secondary)
+                        
+                        Button(action: {
+                            hasError = false
+                            currentURLIndex = -1
+                            loadImage()
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 10))
+                                .foregroundColor(.blue)
+                        }
                     }
                 }
             } else if downloadManager.isDownloading {
@@ -46,6 +64,9 @@ struct CachedAsyncImage: View {
                     loadImage()
                 }
                 .onChange(of: url) { _ in
+                    image = nil
+                    hasError = false
+                    currentURLIndex = -1
                     loadImage()
                 }
             }
@@ -53,11 +74,29 @@ struct CachedAsyncImage: View {
     }
     
     private func loadImage() {
-        guard let url = url else { return }
+        let targetURL: URL?
+        if currentURLIndex == -1 {
+            targetURL = url
+        } else if currentURLIndex < fallbackURLs.count {
+            targetURL = fallbackURLs[currentURLIndex]
+        } else {
+            targetURL = nil
+        }
+        
+        guard let activeURL = targetURL else {
+            if currentURLIndex < fallbackURLs.count - 1 {
+                currentURLIndex += 1
+                loadImage()
+            } else {
+                self.hasError = true
+            }
+            return
+        }
+        
+        print("🌐 [CachedAsyncImage] Trying URL (\(currentURLIndex == -1 ? "Primary" : "Fallback \(currentURLIndex)")): \(activeURL.absoluteString)")
         
         // Check cache - use a sanitized version of the URL as the key
-        // Swift's .hash is not stable across launches, so we sanitize the string
-        let cacheKey = url.absoluteString.components(separatedBy: CharacterSet.alphanumerics.inverted).joined()
+        let cacheKey = activeURL.absoluteString.components(separatedBy: CharacterSet.alphanumerics.inverted).joined()
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("ImageCache")
         
         if !FileManager.default.fileExists(atPath: cacheDir.path) {
@@ -67,36 +106,48 @@ struct CachedAsyncImage: View {
         let cachedFileURL = cacheDir.appendingPathComponent(cacheKey)
         
         if let cachedData = try? Data(contentsOf: cachedFileURL), let cachedImage = UIImage(data: cachedData) {
-            print("📦 [CachedAsyncImage] Using cache for: \(url.lastPathComponent)")
+            print("📦 [CachedAsyncImage] Using cache for: \(activeURL.lastPathComponent)")
             self.image = cachedImage
             self.hasError = false
             return
+        } else if FileManager.default.fileExists(atPath: cachedFileURL.path) {
+            // If file exists but UIImage failed, it's likely corrupt
+            try? FileManager.default.removeItem(at: cachedFileURL)
         }
         
-        print("🌐 [CachedAsyncImage] Downloading: \(url.absoluteString)")
+        print("🌐 [CachedAsyncImage] Downloading: \(activeURL.absoluteString)")
         // Download
         Task {
             do {
-                let tempURL = try await downloadManager.download(url: url, to: cachedFileURL)
+                let tempURL = try await downloadManager.download(url: activeURL, to: cachedFileURL)
+                print("✅ [CachedAsyncImage] Download finished: \(activeURL.lastPathComponent)")
+                
                 if let data = try? Data(contentsOf: tempURL), let downloadedImage = UIImage(data: data) {
                     // Save to cache
                     try? data.write(to: cachedFileURL)
+                    // Clean up temp file
+                    try? FileManager.default.removeItem(at: tempURL)
                     
-                    DispatchQueue.main.async {
-                        self.image = downloadedImage
-                        self.hasError = false
-                    }
+                    self.image = downloadedImage
+                    self.hasError = false
                 } else {
-                    DispatchQueue.main.async {
-                        self.hasError = true
-                    }
+                    print("❌ [CachedAsyncImage] Failed to create image from data: \(activeURL.lastPathComponent)")
+                    try? FileManager.default.removeItem(at: tempURL)
+                    tryNextURL()
                 }
             } catch {
                 print("❌ [CachedAsyncImage] Error: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    self.hasError = true
-                }
+                tryNextURL()
             }
+        }
+    }
+    
+    private func tryNextURL() {
+        if currentURLIndex < fallbackURLs.count - 1 {
+            currentURLIndex += 1
+            loadImage()
+        } else {
+            self.hasError = true
         }
     }
 }

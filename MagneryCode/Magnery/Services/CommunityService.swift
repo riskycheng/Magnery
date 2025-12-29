@@ -27,7 +27,16 @@ struct CommunityMagnet: Identifiable, Codable {
     
     var imageURL: URL? {
         let base = CommunityConfig.baseURL
-        let name = imageName.trimmingCharacters(in: .whitespacesAndNewlines)
+        var name = imageName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Fallback: if imageName is empty but modelName exists, try using modelName with .jpg
+        if name.isEmpty, let model = modelName?.trimmingCharacters(in: .whitespacesAndNewlines), !model.isEmpty {
+            let baseName = (model as NSString).deletingPathExtension
+            name = baseName + ".jpg"
+        }
+        
+        if name.isEmpty { return nil }
+        
         let fullString = name.hasPrefix("http") ? name : base + name
         
         // Only encode if it's not already a valid URL
@@ -37,6 +46,40 @@ struct CommunityMagnet: Identifiable, Codable {
         
         // If it fails, try encoding only the characters that are definitely illegal in a URL
         return URL(string: fullString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? fullString)
+    }
+    
+    var imageFallbackURLs: [URL] {
+        let base = CommunityConfig.baseURL
+        var urls: [URL] = []
+        let extensions = ["jpg", "JPG", "png", "PNG", "jpeg", "JPEG"]
+        
+        // 1. Try variations of the imageName if it exists
+        let name = imageName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty {
+            let baseName = (name as NSString).deletingPathExtension
+            for ext in extensions {
+                let fallbackURLString = base + baseName + "." + ext
+                if let url = URL(string: fallbackURLString), url.absoluteString != imageURL?.absoluteString {
+                    if !urls.contains(url) {
+                        urls.append(url)
+                    }
+                }
+            }
+        }
+        
+        // 2. Try variations of the modelName
+        if let model = modelName?.trimmingCharacters(in: .whitespacesAndNewlines), !model.isEmpty {
+            let baseName = (model as NSString).deletingPathExtension
+            for ext in extensions {
+                let fallbackURLString = base + baseName + "." + ext
+                if let url = URL(string: fallbackURLString), url.absoluteString != imageURL?.absoluteString {
+                    if !urls.contains(url) {
+                        urls.append(url)
+                    }
+                }
+            }
+        }
+        return urls
     }
     
     var gifURL: URL? {

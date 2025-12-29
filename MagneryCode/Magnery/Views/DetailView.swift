@@ -72,7 +72,7 @@ struct DetailView: View {
                         // Handle both local and remote images
                         Group {
                             if currentMagnet.imagePath.hasPrefix("http") {
-                                CachedAsyncImage(url: URL(string: currentMagnet.imagePath))
+                                CachedAsyncImage(url: currentMagnet.imageURL, fallbackURLs: currentMagnet.imageFallbackURLs)
                                     .aspectRatio(contentMode: .fit)
                             } else if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
                                 Image(uiImage: image)
