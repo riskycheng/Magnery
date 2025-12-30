@@ -19,8 +19,7 @@ struct Model3DView: View {
                     pointOfView: cameraNode,
                     options: [.autoenablesDefaultLighting, .allowsCameraControl]
                 )
-                .frame(maxWidth: .infinity)
-                .frame(height: 350)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.clear)
             } else if isLoading {
                 VStack(spacing: 12) {

@@ -146,11 +146,16 @@ class CommunityService: ObservableObject {
         var request = URLRequest(url: manifestURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 30
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        // Use ephemeral session to avoid DNS/Cache issues
+        let config = URLSessionConfiguration.ephemeral
+        let session = URLSession(configuration: config)
+        
+        let task = session.dataTask(with: request) { [weak self] data, response, error in
             if let error = error {
-                print("❌ [CommunityService] Manifest fetch error: \(error.localizedDescription)")
+                print("❌ [CommunityService] Manifest fetch error: \(error.localizedDescription) (code: \((error as NSError).code))")
+                
                 DispatchQueue.main.async {
                     self?.errorMessage = "加载失败: \(error.localizedDescription)"
                     self?.isLoading = false
@@ -186,7 +191,9 @@ class CommunityService: ObservableObject {
                     self?.isLoading = false
                 }
             }
-        }.resume()
+        }
+        print("🚀 [CommunityService] Task resumed")
+        task.resume()
     }
     
     private func fetchIndividualMagnets(names: [String]) {
@@ -206,6 +213,9 @@ class CommunityService: ObservableObject {
         var fetchedItems: [CommunityMagnet] = []
         let lock = NSLock()
         
+        let config = URLSessionConfiguration.ephemeral
+        let session = URLSession(configuration: config)
+        
         for name in names {
             group.enter()
             guard let url = URL(string: CommunityConfig.baseURL + name) else {
@@ -217,9 +227,10 @@ class CommunityService: ObservableObject {
             var request = URLRequest(url: url)
             request.cachePolicy = .reloadIgnoringLocalCacheData
             request.timeoutInterval = 30
+            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
             request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
             
-            URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            session.dataTask(with: request) { [weak self] data, response, error in
                 defer { group.leave() }
                 
                 if let error = error {
