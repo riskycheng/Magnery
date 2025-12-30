@@ -89,7 +89,7 @@ struct Model3DView: View {
             let cachedURL = modelsDir.appendingPathComponent(url.lastPathComponent)
             
             if fileManager.fileExists(atPath: cachedURL.path) {
-                // Verify cached file is not a Gitee error page (usually < 1KB)
+                // Verify cached file is not an error page (usually < 1KB)
                 if let attrs = try? fileManager.attributesOfItem(atPath: cachedURL.path),
                    let size = attrs[.size] as? UInt64, size > 1024 {
                     print("📦 [Model3DView] Using cached model: \(cachedURL.lastPathComponent) (\(size) bytes)")

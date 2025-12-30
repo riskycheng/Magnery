@@ -2,12 +2,7 @@ import Foundation
 import Combine
 
 struct CommunityConfig {
-    // Change this to switch between different hosting environments
-    static let baseURL = "http://t81751iws.hn-bkt.clouddn.com/magnets_resources/"
-    
-    // Examples:
-    // static let baseURL = "https://gitee.com/riskycheng/magnery-res/raw/master/"
-    // static let baseURL = "https://riskycheng.gitee.io/magnery-res/" // Gitee Pages
+    static let baseURL = "https://magnery-1259559729.cos.ap-shanghai.myqcloud.com/magnery_resources/"
 }
 
 struct CommunityMagnet: Identifiable, Codable {
@@ -129,32 +124,68 @@ class CommunityService: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    func fetchCommunityContent() {
-        guard !isLoading else { return }
-        isLoading = true
-        errorMessage = nil
+    private var lastFetchTime: Date?
+    private let fetchCooldown: TimeInterval = 5.0 // Don't refetch within 5 seconds
+    
+    private class FetchState {
+        var items: [CommunityMagnet] = []
+        let lock = NSLock()
+    }
+    
+    func fetchCommunityContent(retryCount: Int = 0) {
+        // Prevent redundant fetches
+        if retryCount == 0 {
+            if let last = lastFetchTime, Date().timeIntervalSince(last) < fetchCooldown && !popularMagnets.isEmpty {
+                print("ℹ️ [CommunityService] Skipping fetch due to cooldown")
+                return
+            }
+        }
         
-        guard let manifestURL = URL(string: CommunityConfig.baseURL + "manifest.json") else {
+        guard !isLoading || retryCount > 0 else { return }
+        
+        if retryCount == 0 {
+            isLoading = true
+            errorMessage = nil
+            lastFetchTime = Date()
+        }
+        
+        let urlString = CommunityConfig.baseURL + "manifest.json"
+        guard let manifestURL = URL(string: urlString) else {
             print("❌ [CommunityService] Invalid manifest URL")
             self.errorMessage = "无效的 URL"
             self.isLoading = false
             return
         }
         
-        print("🌐 [CommunityService] Fetching manifest from: \(manifestURL.absoluteString)")
+        print("🌐 [CommunityService] Fetching manifest from: \(manifestURL.absoluteString) (Attempt \(retryCount + 1))")
         
         var request = URLRequest(url: manifestURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.timeoutInterval = 30
+        request.timeoutInterval = 15
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
         
-        // Use ephemeral session to avoid DNS/Cache issues
         let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
         let session = URLSession(configuration: config)
         
         let task = session.dataTask(with: request) { [weak self] data, response, error in
+            print("📡 [CommunityService] Manifest task completed. Error: \(error?.localizedDescription ?? "none")")
+            
             if let error = error {
-                print("❌ [CommunityService] Manifest fetch error: \(error.localizedDescription) (code: \((error as NSError).code))")
+                let nsError = error as NSError
+                print("❌ [CommunityService] Manifest fetch error: \(error.localizedDescription) (code: \(nsError.code))")
+                
+                // Standard retry logic for the current URL
+                if retryCount < 2 && (nsError.code == -1003 || nsError.code == -1001 || nsError.code == -1004) {
+                    let delay = Double(retryCount + 1) * 1.0
+                    print("🔄 [CommunityService] Retrying current URL in \(delay)s...")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                        self?.fetchCommunityContent(retryCount: retryCount + 1)
+                    }
+                    return
+                }
                 
                 DispatchQueue.main.async {
                     self?.errorMessage = "加载失败: \(error.localizedDescription)"
@@ -165,6 +196,14 @@ class CommunityService: ObservableObject {
             
             if let httpResponse = response as? HTTPURLResponse {
                 print("📡 [CommunityService] Manifest response code: \(httpResponse.statusCode)")
+                
+                if httpResponse.statusCode != 200 {
+                    DispatchQueue.main.async {
+                        self?.errorMessage = "服务器错误: \(httpResponse.statusCode)"
+                        self?.isLoading = false
+                    }
+                    return
+                }
             }
             
             guard let data = data else {
@@ -182,7 +221,7 @@ class CommunityService: ObservableObject {
             
             do {
                 let manifest = try JSONDecoder().decode(CommunityManifest.self, from: data)
-                print("✅ [CommunityService] Manifest decoded, found \(manifest.items.count) items")
+                print("✅ [CommunityService] Manifest decoded from \(CommunityConfig.baseURL), found \(manifest.items.count) items")
                 self?.fetchIndividualMagnets(names: manifest.items)
             } catch {
                 print("❌ [CommunityService] Manifest decoding error: \(error)")
@@ -209,60 +248,107 @@ class CommunityService: ObservableObject {
         }
         
         // Use a thread-safe way to collect items
-        let queue = DispatchQueue(label: "com.magnery.community.fetch", attributes: .concurrent)
-        var fetchedItems: [CommunityMagnet] = []
-        let lock = NSLock()
+        let state = FetchState()
         
         let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.httpMaximumConnectionsPerHost = 4 // Limit concurrency for poor networks
         let session = URLSession(configuration: config)
         
-        for name in names {
-            group.enter()
-            guard let url = URL(string: CommunityConfig.baseURL + name) else {
-                print("⚠️ [CommunityService] Invalid URL for item: \(name)")
-                group.leave()
-                continue
+        // Process in small batches to avoid overwhelming the network
+        let batchSize = 3
+        let batches = stride(from: 0, to: names.count, by: batchSize).map {
+            Array(names[$0..<min($0 + batchSize, names.count)])
+        }
+        
+        func processBatch(index: Int) {
+            guard index < batches.count else {
+                group.notify(queue: .main) { [weak self] in
+                    print("🏁 [CommunityService] Finished fetching all items")
+                    self?.isLoading = false
+                }
+                return
             }
             
-            var request = URLRequest(url: url)
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            request.timeoutInterval = 30
-            request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
-            request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+            let batch = batches[index]
+            let batchGroup = DispatchGroup()
             
-            session.dataTask(with: request) { [weak self] data, response, error in
-                defer { group.leave() }
+            for name in batch {
+                batchGroup.enter()
+                group.enter()
+                self.fetchSingleMagnet(name: name, session: session, decoder: decoder, group: group, state: state) {
+                    batchGroup.leave()
+                }
+            }
+            
+            batchGroup.notify(queue: .global()) {
+                // Small delay between batches to let the network breathe
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
+                    processBatch(index: index + 1)
+                }
+            }
+        }
+        
+        processBatch(index: 0)
+    }
+    
+    private func fetchSingleMagnet(name: String, session: URLSession, decoder: JSONDecoder, group: DispatchGroup, state: FetchState, retryCount: Int = 0, completion: @escaping () -> Void) {
+        guard let url = URL(string: CommunityConfig.baseURL + name) else {
+            print("⚠️ [CommunityService] Invalid URL for item: \(name)")
+            group.leave()
+            completion()
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 20
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        
+        session.dataTask(with: request) { [weak self] data, response, error in
+            if let error = error {
+                let nsError = error as NSError
+                print("❌ [CommunityService] Error fetching \(name): \(error.localizedDescription) (code: \(nsError.code))")
                 
-                if let error = error {
-                    print("❌ [CommunityService] Error fetching \(name): \(error.localizedDescription)")
+                if retryCount < 2 && (nsError.code == -1003 || nsError.code == -1001 || nsError.code == -1004) {
+                    let delay = Double(retryCount + 1) * 0.5
+                    DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                        self?.fetchSingleMagnet(name: name, session: session, decoder: decoder, group: group, state: state, retryCount: retryCount + 1, completion: completion)
+                    }
                     return
                 }
                 
-                guard let data = data else { return }
+                group.leave()
+                completion()
+                return
+            }
+            
+            defer { 
+                group.leave()
+                completion()
+            }
+            guard let data = data else { return }
+            
+            do {
+                let item = try decoder.decode(CommunityMagnet.self, from: data)
+                print("✅ [CommunityService] Decoded item: \(item.name)")
                 
-                do {
-                    let item = try decoder.decode(CommunityMagnet.self, from: data)
-                    
-                    lock.lock()
-                    fetchedItems.append(item)
-                    let currentItems = fetchedItems.sorted(by: { $0.date > $1.date })
-                    lock.unlock()
-                    
-                    // Update UI on main thread with a small delay to batch updates
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        if self?.popularMagnets.count != currentItems.count {
-                            self?.popularMagnets = currentItems
-                        }
+                state.lock.lock()
+                state.items.append(item)
+                let currentItems = state.items.sorted(by: { $0.date > $1.date })
+                state.lock.unlock()
+                
+                // Update UI on main thread
+                DispatchQueue.main.async {
+                    if self?.popularMagnets.count != currentItems.count {
+                        self?.popularMagnets = currentItems
                     }
-                } catch {
-                    print("❌ [CommunityService] Decoding error for \(name): \(error)")
                 }
-            }.resume()
-        }
-        
-        group.notify(queue: .main) { [weak self] in
-            print("🏁 [CommunityService] Finished fetching all items")
-            self?.isLoading = false
-        }
+            } catch {
+                print("❌ [CommunityService] Decoding error for \(name): \(error)")
+            }
+        }.resume()
     }
 }

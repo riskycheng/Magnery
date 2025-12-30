@@ -56,8 +56,9 @@ struct CommunityView: View {
                 }
                 
                 // 2. Trigger the fetch immediately
+                print("📱 [CommunityView] onAppear triggered")
                 if communityService.popularMagnets.isEmpty {
-                    print("📱 [CommunityView] Immediate fetch triggered")
+                    print("📱 [CommunityView] Starting fetch because magnets are empty")
                     communityService.fetchCommunityContent()
                 }
             }
@@ -167,17 +168,34 @@ struct CommunityView: View {
     }
     
     private func errorState(_ message: String) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Image(systemName: "wifi.exclamationmark")
-                .font(.system(size: 50))
-                .foregroundColor(.gray)
-            Text(message)
-                .foregroundColor(.secondary)
-            Button("重试") {
-                communityService.fetchCommunityContent()
+                .font(.system(size: 60))
+                .foregroundColor(.orange.opacity(0.6))
+            
+            VStack(spacing: 8) {
+                Text("网络连接较慢")
+                    .font(.headline)
+                Text("请检查网络设置或稍后重试")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            
+            Button(action: {
+                communityService.fetchCommunityContent()
+            }) {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("重新加载")
+                }
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 30)
+                .padding(.vertical, 12)
+                .background(Color.orange)
+                .clipShape(Capsule())
+                .shadow(color: .orange.opacity(0.3), radius: 10, x: 0, y: 5)
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 400)
     }

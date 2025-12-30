@@ -33,7 +33,7 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
         if let url = URL(string: imagePath) {
             baseURL = url.deletingLastPathComponent().absoluteString + "/"
         } else {
-            baseURL = "http://t81751iws.hn-bkt.clouddn.com/magnets_resources/"
+            baseURL = "https://magnery-1259559729.cos.ap-shanghai.myqcloud.com/magnery_resources/"
         }
         
         var urls: [URL] = []

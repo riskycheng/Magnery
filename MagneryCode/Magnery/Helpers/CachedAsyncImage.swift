@@ -22,24 +22,33 @@ struct CachedAsyncImage: View {
             } else if hasError {
                 ZStack {
                     Color.gray.opacity(0.1)
-                    VStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .foregroundColor(.orange.opacity(0.6))
-                        Text("加载失败")
-                            .font(.system(size: 8))
+                    VStack(spacing: 8) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 20))
+                            .foregroundColor(.orange.opacity(0.8))
+                        
+                        Text("网络较慢")
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.secondary)
                         
                         Button(action: {
-                            hasError = false
-                            currentURLIndex = -1
-                            loadImage()
+                            withAnimation {
+                                hasError = false
+                                currentURLIndex = -1
+                                loadImage()
+                            }
                         }) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 10))
-                                .foregroundColor(.blue)
+                            Text("重试")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(Color.orange)
+                                .clipShape(Capsule())
                         }
                     }
                 }
+                .transition(.opacity)
             } else if downloadManager.isDownloading {
                 ZStack {
                     Color.gray.opacity(0.1)

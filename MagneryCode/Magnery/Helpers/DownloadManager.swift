@@ -18,7 +18,13 @@ class DownloadManager: NSObject, ObservableObject, URLSessionDownloadDelegate {
         
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
-            let session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
+            
+            let config = URLSessionConfiguration.ephemeral
+            config.waitsForConnectivity = true
+            config.timeoutIntervalForRequest = 20
+            config.timeoutIntervalForResource = 60 // Max 1 minute for a single file
+            
+            let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
             let task = session.downloadTask(with: url)
             task.resume()
         }
