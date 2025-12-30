@@ -31,18 +31,33 @@ struct MainTabView: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Content with Swipe Support
-            TabView(selection: $selectedTab) {
-                HomeView()
-                    .tag(Tab.home)
-                
-                CommunityView()
-                    .tag(Tab.community)
-                
-                PersonalView()
-                    .tag(Tab.personal)
+            // Content with Custom Switcher (No full-screen swipe)
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    HomeView()
+                        .frame(width: proxy.size.width)
+                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
+                            if selectedTab != .home { value = true }
+                        }
+                        .allowsHitTesting(selectedTab == .home)
+                    
+                    CommunityView()
+                        .frame(width: proxy.size.width)
+                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
+                            if selectedTab != .community { value = true }
+                        }
+                        .allowsHitTesting(selectedTab == .community)
+                    
+                    PersonalView()
+                        .frame(width: proxy.size.width)
+                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
+                            if selectedTab != .personal { value = true }
+                        }
+                        .allowsHitTesting(selectedTab == .personal)
+                }
+                .offset(x: -CGFloat(selectedTab.index) * proxy.size.width)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedTab)
             .ignoresSafeArea()
             
             // Floating Tab Bar
