@@ -207,7 +207,7 @@ struct Model3DView: View {
         newCameraNode.camera = camera
         
         // Since we centered the model at (0,0,0), the camera just needs to look at the origin
-        newCameraNode.position = SCNVector3(x: 0, y: 0, z: radius * 1.0)
+        newCameraNode.position = SCNVector3(x: 0, y: 0, z: radius * 1.3)
         scnScene.rootNode.addChildNode(newCameraNode)
         
         // 6. Add basic lighting

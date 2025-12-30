@@ -43,7 +43,6 @@ struct DetailView: View {
                     Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
                         .frame(maxWidth: .infinity)
                         .frame(height: 500)
-                        .padding(.horizontal, 20)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
                             removal: .scale(scale: 0.8).combined(with: .opacity)
