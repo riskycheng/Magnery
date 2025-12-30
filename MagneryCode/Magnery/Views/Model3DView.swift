@@ -171,39 +171,64 @@ struct Model3DView: View {
         // Set background to clear for transparency
         scnScene.background.contents = UIColor.clear
         
-        // Re-apply the rotation that usually works for USDZ models
-        scnScene.rootNode.eulerAngles = SCNVector3(-Float.pi / 2, 0, 0)
+        // 1. Create a container node
+        let modelContainer = SCNNode()
+        for node in scnScene.rootNode.childNodes {
+            modelContainer.addChildNode(node)
+        }
+        scnScene.rootNode.addChildNode(modelContainer)
         
-        let (boxMin, boxMax) = scnScene.rootNode.boundingBox
+        // 2. Calculate bounding box and center
+        let (boxMin, boxMax) = modelContainer.boundingBox
         let midX = (boxMax.x + boxMin.x) / 2
         let midY = (boxMax.y + boxMin.y) / 2
         let midZ = (boxMax.z + boxMin.z) / 2
-        let radius = max(max(boxMax.x - boxMin.x, boxMax.y - boxMin.y), boxMax.z - boxMin.z)
-
-        // Create a dedicated camera node for the initial view
+        let sizeX = boxMax.x - boxMin.x
+        let sizeY = boxMax.y - boxMin.y
+        let sizeZ = boxMax.z - boxMin.z
+        let radius = max(max(sizeX, sizeY), sizeZ)
+        
+        // 3. Center the model's geometry within the container
+        // This makes rotation happen around the model's actual center
+        for node in modelContainer.childNodes {
+            node.position = SCNVector3(
+                node.position.x - midX,
+                node.position.y - midY,
+                node.position.z - midZ
+            )
+        }
+        
+        // 4. Apply orientation adjustment
+        // Based on logs: X=1.15, Y=0.21, Z=1.15. Model is lying flat on XZ plane.
+        // We rotate it 90 degrees on X to stand it up.
+        // Try -90 first, if it's the back, we'll try +90.
+        modelContainer.eulerAngles = SCNVector3(-Float.pi / 2, 0, 0)
+        
+        // 5. Create and position the camera
         let camera = SCNCamera()
         camera.zNear = 0.01
         camera.zFar = Double(radius) * 100.0
         
         let newCameraNode = SCNNode()
         newCameraNode.camera = camera
-        // Position camera to see the model clearly and make it look larger
-        newCameraNode.position = SCNVector3(x: midX, y: midY, z: midZ + radius * 1.3)
+        
+        // Since we centered the model at (0,0,0), the camera just needs to look at the origin
+        newCameraNode.position = SCNVector3(x: 0, y: 0, z: radius * 1.2)
         scnScene.rootNode.addChildNode(newCameraNode)
         
-        // Add basic lighting
+        // 6. Add basic lighting
         let ambientLightNode = SCNNode()
         ambientLightNode.light = SCNLight()
         ambientLightNode.light?.type = .ambient
-        ambientLightNode.light?.color = UIColor(white: 0.6, alpha: 1.0)
+        ambientLightNode.light?.color = UIColor(white: 0.7, alpha: 1.0)
         scnScene.rootNode.addChildNode(ambientLightNode)
         
         let directionalLightNode = SCNNode()
         directionalLightNode.light = SCNLight()
         directionalLightNode.light?.type = .directional
         directionalLightNode.light?.intensity = 1000
-        directionalLightNode.position = SCNVector3(x: midX + radius, y: midY + radius, z: midZ + radius)
-        directionalLightNode.look(at: SCNVector3(midX, midY, midZ))
+        directionalLightNode.position = SCNVector3(x: radius, y: radius, z: radius)
+        directionalLightNode.look(at: SCNVector3(0, 0, 0))
         scnScene.rootNode.addChildNode(directionalLightNode)
         
         DispatchQueue.main.async {
