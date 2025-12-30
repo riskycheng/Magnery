@@ -6,6 +6,7 @@ import SceneKit.ModelIO
 struct Model3DView: View {
     let url: URL
     @State private var scene: SCNScene?
+    @State private var cameraNode: SCNNode?
     @State private var isLoading = true
     @State private var error: String?
     @StateObject private var downloadManager = DownloadManager()
@@ -15,6 +16,7 @@ struct Model3DView: View {
             if let scene = scene {
                 SceneView(
                     scene: scene,
+                    pointOfView: cameraNode,
                     options: [.autoenablesDefaultLighting, .allowsCameraControl]
                 )
                 .frame(maxWidth: .infinity)
@@ -169,9 +171,7 @@ struct Model3DView: View {
         // Set background to clear for transparency
         scnScene.background.contents = UIColor.clear
         
-        // Reset root node rotation to ensure frontal view
-        // Rotate 90 degrees on X axis as requested to face the view
-        scnScene.rootNode.rotation = SCNVector4(0, 0, 0, 0)
+        // Re-apply the rotation that usually works for USDZ models
         scnScene.rootNode.eulerAngles = SCNVector3(-Float.pi / 2, 0, 0)
         
         let (boxMin, boxMax) = scnScene.rootNode.boundingBox
@@ -180,27 +180,34 @@ struct Model3DView: View {
         let midZ = (boxMax.z + boxMin.z) / 2
         let radius = max(max(boxMax.x - boxMin.x, boxMax.y - boxMin.y), boxMax.z - boxMin.z)
 
-        // 1. Ensure there's a camera
-        let hasCamera = scnScene.rootNode.childNodes.contains { $0.camera != nil }
-        if !hasCamera {
-            let cameraNode = SCNNode()
-            cameraNode.camera = SCNCamera()
-            cameraNode.position = SCNVector3(x: midX, y: midY, z: midZ + radius * 2.5)
-            scnScene.rootNode.addChildNode(cameraNode)
-        }
+        // Create a dedicated camera node for the initial view
+        let camera = SCNCamera()
+        camera.zNear = 0.01
+        camera.zFar = Double(radius) * 100.0
         
-        // 2. Add basic lighting if the scene is too dark
+        let newCameraNode = SCNNode()
+        newCameraNode.camera = camera
+        // Position camera to see the model clearly and make it look larger
+        newCameraNode.position = SCNVector3(x: midX, y: midY, z: midZ + radius * 1.3)
+        scnScene.rootNode.addChildNode(newCameraNode)
+        
+        // Add basic lighting
         let ambientLightNode = SCNNode()
         ambientLightNode.light = SCNLight()
         ambientLightNode.light?.type = .ambient
-        ambientLightNode.light?.color = UIColor(white: 0.5, alpha: 1.0)
+        ambientLightNode.light?.color = UIColor(white: 0.6, alpha: 1.0)
         scnScene.rootNode.addChildNode(ambientLightNode)
         
         let directionalLightNode = SCNNode()
         directionalLightNode.light = SCNLight()
         directionalLightNode.light?.type = .directional
+        directionalLightNode.light?.intensity = 1000
         directionalLightNode.position = SCNVector3(x: midX + radius, y: midY + radius, z: midZ + radius)
         directionalLightNode.look(at: SCNVector3(midX, midY, midZ))
         scnScene.rootNode.addChildNode(directionalLightNode)
+        
+        DispatchQueue.main.async {
+            self.cameraNode = newCameraNode
+        }
     }
 }

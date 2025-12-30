@@ -41,18 +41,13 @@ struct DetailView: View {
                     Spacer()
                     
                     if let modelPath = currentMagnet.modelPath {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(Color.clear)
-                            
-                            Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
-                        }
-                        .frame(height: 350)
-                        .padding(.horizontal, 20)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
+                        Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
+                            .frame(height: 350)
+                            .padding(.horizontal, 20)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 0.8).combined(with: .opacity)
+                            ))
                     } else if let gifPath = currentMagnet.gifPath {
                         NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
                             .frame(maxHeight: 350)
