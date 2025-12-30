@@ -28,56 +28,29 @@ struct DetailView: View {
     
     var body: some View {
         ZStack {
-            ZStack {
-                Color(red: 0.95, green: 0.95, blue: 0.97)
-                    .ignoresSafeArea()
+            Color(red: 0.95, green: 0.95, blue: 0.97)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                if !groupItems.isEmpty {
+                    horizontalItemsList
+                        .padding(.top, 8)
+                }
                 
-                VStack(spacing: 0) {
-                    if !groupItems.isEmpty {
-                        horizontalItemsList
-                            .padding(.top, 8)
-                    }
-                    
-                    Spacer()
-                    
-                    if let modelPath = currentMagnet.modelPath {
-                        Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
-                            .frame(height: 350)
-                            .padding(.horizontal, 20)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                removal: .scale(scale: 0.8).combined(with: .opacity)
-                            ))
-                    } else if let gifPath = currentMagnet.gifPath {
-                        NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
-                            .frame(maxHeight: 350)
-                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-                            .padding(.horizontal, 40)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                removal: .scale(scale: 0.8).combined(with: .opacity)
-                            ))
-                            .gesture(
-                                DragGesture(minimumDistance: 30)
-                                    .onEnded { value in
-                                        handleSwipeGesture(translation: value.translation)
-                                    }
-                            )
-                    } else {
-                        // Handle both local and remote images
-                        Group {
-                            if currentMagnet.imagePath.hasPrefix("http") {
-                                CachedAsyncImage(url: currentMagnet.imageURL, fallbackURLs: currentMagnet.imageFallbackURLs)
-                                    .aspectRatio(contentMode: .fit)
-                            } else if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            }
-                        }
+                Spacer()
+                
+                if let modelPath = currentMagnet.modelPath {
+                    Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 500)
+                        .padding(.horizontal, 20)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.8).combined(with: .opacity),
+                            removal: .scale(scale: 0.8).combined(with: .opacity)
+                        ))
+                } else if let gifPath = currentMagnet.gifPath {
+                    NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
                         .frame(maxHeight: 350)
-                        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-                        .padding(.horizontal, 40)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
                             removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -88,71 +61,65 @@ struct DetailView: View {
                                     handleSwipeGesture(translation: value.translation)
                                 }
                         )
-                    }
-                    
-                    VStack(spacing: 8) {
-                        Text(currentMagnet.name)
-                            .font(.system(size: 32, weight: .bold, design: .default))
-                            .foregroundColor(.primary)
-                        
-                        if !currentMagnet.notes.isEmpty {
-                            Text(currentMagnet.notes)
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
+                } else {
+                    // Handle both local and remote images
+                    Group {
+                        if currentMagnet.imagePath.hasPrefix("http") {
+                            CachedAsyncImage(url: currentMagnet.imageURL, fallbackURLs: currentMagnet.imageFallbackURLs)
+                                .aspectRatio(contentMode: .fit)
+                        } else if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
                         }
                     }
-                    .padding(.top, 24)
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        showingAIDialog = true
-                    }) {
-                        HStack {
-                            Image(systemName: "lightbulb.fill")
-                            Text("AI科普")
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(Color.orange)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.white)
-                        .clipShape(Capsule())
-                        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
-                        .padding(.horizontal, 40)
-                    }
-                    .padding(.bottom, 40)
+                    .frame(maxHeight: 350)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.8).combined(with: .opacity),
+                        removal: .scale(scale: 0.8).combined(with: .opacity)
+                    ))
+                    .gesture(
+                        DragGesture(minimumDistance: 30)
+                            .onEnded { value in
+                                    handleSwipeGesture(translation: value.translation)
+                            }
+                    )
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            showingEditMenu.toggle()
-                        }
-                    }) {
-                        Image(systemName: "ellipsis")
-                            .foregroundColor(.primary)
-                            .padding(8)
-                            .background(
-                                GeometryReader { geo in
-                                    Color.clear
-                                        .preference(
-                                            key: EllipsisButtonBoundsKey.self,
-                                            value: geo.frame(in: .named("detail_root")).midX > 0 ? geo.frame(in: .named("detail_root")) : nil
-                                        )
-                                }
-                            )
+                
+                VStack(spacing: 8) {
+                    Text(currentMagnet.name)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .foregroundColor(.primary)
+                    
+                    if !currentMagnet.notes.isEmpty {
+                        Text(currentMagnet.notes)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
                     }
                 }
-            }
-            .onPreferenceChange(EllipsisButtonBoundsKey.self) { frame in
-                if let frame = frame {
-                    ellipsisButtonFrame = frame
+                .padding(.top, 24)
+                
+                Spacer()
+                
+                Button(action: {
+                    showingAIDialog = true
+                }) {
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                        Text("AI科普")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(Color.orange)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.white)
+                    .clipShape(Capsule())
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+                    .padding(.horizontal, 40)
                 }
+                .padding(.bottom, 40)
             }
             
             // Dimmed background when menu is showing
@@ -173,6 +140,34 @@ struct DetailView: View {
                         y: ellipsisButtonFrame.midY + 105
                     )
                     .zIndex(999)
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        showingEditMenu.toggle()
+                    }
+                }) {
+                    Image(systemName: "ellipsis")
+                        .foregroundColor(.primary)
+                        .padding(8)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear
+                                    .preference(
+                                        key: EllipsisButtonBoundsKey.self,
+                                        value: geo.frame(in: .named("detail_root")).midX > 0 ? geo.frame(in: .named("detail_root")) : nil
+                                    )
+                            }
+                        )
+                }
+            }
+        }
+        .onPreferenceChange(EllipsisButtonBoundsKey.self) { frame in
+            if let frame = frame {
+                ellipsisButtonFrame = frame
             }
         }
         .coordinateSpace(name: "detail_root")

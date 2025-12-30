@@ -14,13 +14,8 @@ struct Model3DView: View {
     var body: some View {
         ZStack {
             if let scene = scene {
-                SceneView(
-                    scene: scene,
-                    pointOfView: cameraNode,
-                    options: [.autoenablesDefaultLighting, .allowsCameraControl]
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.clear)
+                TransparentSceneView(scene: scene, cameraNode: cameraNode)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if isLoading {
                 VStack(spacing: 12) {
                     ZStack {
@@ -212,7 +207,7 @@ struct Model3DView: View {
         newCameraNode.camera = camera
         
         // Since we centered the model at (0,0,0), the camera just needs to look at the origin
-        newCameraNode.position = SCNVector3(x: 0, y: 0, z: radius * 1.2)
+        newCameraNode.position = SCNVector3(x: 0, y: 0, z: radius * 1.0)
         scnScene.rootNode.addChildNode(newCameraNode)
         
         // 6. Add basic lighting
@@ -233,5 +228,27 @@ struct Model3DView: View {
         DispatchQueue.main.async {
             self.cameraNode = newCameraNode
         }
+    }
+}
+
+struct TransparentSceneView: UIViewRepresentable {
+    let scene: SCNScene
+    let cameraNode: SCNNode?
+    
+    func makeUIView(context: Context) -> SCNView {
+        let scnView = SCNView()
+        scnView.scene = scene
+        scnView.pointOfView = cameraNode
+        scnView.allowsCameraControl = true
+        scnView.autoenablesDefaultLighting = true
+        scnView.backgroundColor = .clear
+        scnView.isOpaque = false
+        scnView.antialiasingMode = .multisampling4X
+        return scnView
+    }
+    
+    func updateUIView(_ uiView: SCNView, context: Context) {
+        uiView.scene = scene
+        uiView.pointOfView = cameraNode
     }
 }
