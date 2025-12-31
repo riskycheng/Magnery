@@ -11,6 +11,8 @@ struct HomeView: View {
     @State private var showingCamera = false
     @State private var ringRotation: Double = 0
     @State private var dotScale: CGFloat = 1.0
+    @State private var pulseScale: CGFloat = 1.0
+    @State private var pulseOpacity: Double = 0.0
     @State private var scrollOffset: CGFloat = 0
     @State private var isCollapsed = false
     @State private var lastScrollUpdate: CGFloat = 0
@@ -47,22 +49,21 @@ struct HomeView: View {
                                 .opacity(homeMode == .map ? 1 : 0)
                                 .scaleEffect(homeMode == .map ? 1 : 0.9)
                         }
-                        .frame(height: 300) // Increased from 260 to 300
-                        .padding(.top, 110) 
+                        .frame(height: homeMode == .camera ? 180 : 260) 
+                        .padding(.top, 100) 
                         .opacity(visualProgress)
-                        .scaleEffect(0.8 + (0.2 * visualProgress))
-                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: homeMode)
+                        .scaleEffect(0.85 + (0.15 * visualProgress))
+                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: homeMode)
                         
                         VStack(spacing: 0) {
                             // Mode and Grouping toggle
                             modeAndGroupingToggle
-                                .padding(.top, 20)
-                                .padding(.bottom, 10)
+                                .padding(.top, 15)
+                                .padding(.bottom, 25)
                             
                             // Content list
                             contentList
                         }
-                        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
                     }
                     .background(
                         GeometryReader { geometry in
@@ -108,38 +109,40 @@ struct HomeView: View {
         let progress = min(1.0, max(0.0, rawProgress))
         let isDocked = scrollOffset < -80
         
-        // Use continuous values for smoother transitions without explicit animation
         let titleSize = 16.0 + (12.0 * progress)
         let verticalSpacing = 1.0 + (4.0 * progress)
         
-        // Instead of changing alignment (which is expensive), we use a fixed alignment 
-        // and adjust the layout based on progress.
         return VStack(spacing: 0) {
             HStack(spacing: 12) {
                 VStack(alignment: .center, spacing: verticalSpacing) {
                     Text(greeting)
                         .font(.system(size: titleSize, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
                         .frame(maxWidth: .infinity, alignment: progress > 0.5 ? .center : .leading)
                     
                     ZStack {
                         // Expanded subtitle
-                        Text("真棒！已经收集了\(store.magnets.count)个冰箱贴，走过\(uniqueLocationsCount)个城市")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .opacity(Double(max(0, (progress - 0.5) * 2)))
+                        HStack(spacing: 4) {
+                            Text("已收集")
+                            Text("\(store.magnets.count)")
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            Text("个冰箱贴")
+                        }
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary.opacity(0.8))
+                        .opacity(Double(max(0, (progress - 0.5) * 2)))
                         
                         // Collapsed subtitle (Stats)
-                        HStack(spacing: 4) {
-                            Image(systemName: "square.grid.2x2.fill")
-                                .font(.system(size: 8))
-                            Text("\(store.magnets.count)个收藏")
-                            Text("·")
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.system(size: 8))
-                            Text("\(uniqueLocationsCount)个城市")
+                        HStack(spacing: 8) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "square.grid.2x2.fill")
+                                    .font(.system(size: 10))
+                                Text("\(store.magnets.count)")
+                                    .fontWeight(.bold)
+                            }
                         }
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary)
                         .opacity(Double(max(0, (0.5 - progress) * 2)))
                     }
@@ -147,28 +150,37 @@ struct HomeView: View {
                 }
                 
                 if isDocked {
-                    // Quick camera button only when docked
                     Button(action: { 
                         let impact = UIImpactFeedbackGenerator(style: .medium)
                         impact.impactOccurred()
                         showingCamera = true 
                     }) {
                         Image(systemName: "camera.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white)
+                            .font(.system(size: 14, weight: .light))
+                            .foregroundColor(.primary)
                             .frame(width: 36, height: 36)
-                            .background(Color.orange)
-                            .clipShape(Circle())
-                            .shadow(color: .orange.opacity(0.3), radius: 4, x: 0, y: 2)
+                            .background(
+                                Circle()
+                                    .fill(.white)
+                                    .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+                            )
                     }
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (30 * progress))
-            .padding(.bottom, 15 + (15 * progress))
+            .padding(.horizontal, 28)
+            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (15 * progress))
+            .padding(.bottom, 12 + (8 * progress))
             .background(
-                Color(red: 0.95, green: 0.95, blue: 0.97)
+                ZStack {
+                    if isDocked {
+                        BlurView(style: .systemUltraThinMaterialLight)
+                            .ignoresSafeArea()
+                    } else {
+                        Color(red: 0.95, green: 0.95, blue: 0.97)
+                            .ignoresSafeArea()
+                    }
+                }
             )
             .overlay(
                 Rectangle()
@@ -203,86 +215,102 @@ struct HomeView: View {
     private var mapViewContainer: some View {
         MapView()
             .frame(maxWidth: .infinity)
-            .frame(height: 220)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .frame(height: 240)
+            .clipShape(RoundedRectangle(cornerRadius: 32))
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color.white, lineWidth: 2)
+                RoundedRectangle(cornerRadius: 32)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
-            .padding(.top, 15)
-    }
-    
-    private var headerView: some View {
-        VStack(spacing: 8) {
-            Text(greeting)
-                .font(.title)
-                .fontWeight(.medium)
-            
-            Text("真棒！已经收集了\(store.magnets.count)个冰箱贴，走过\(uniqueLocationsCount)个城市")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-        }
+            .shadow(color: .black.opacity(0.06), radius: 25, x: 0, y: 12)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 10)
     }
     
     private var cameraButton: some View {
         ZStack {
-            ColorfulRing()
-                .frame(width: 200, height: 200) // Increased from 180 to 200 to accommodate stroke width
-                .rotationEffect(.degrees(ringRotation), anchor: .center)
-            
-            // Dots with pulsing animation
-            ForEach(0..<8) { index in
+            // Pulsing rings
+            ForEach(0..<2) { i in
                 Circle()
-                    .fill(Color.gray.opacity(0.25))
-                    .frame(width: 6, height: 6)
-                    .scaleEffect(dotScale)
-                    .offset(y: -125) // Adjusted from -115 to -125
-                    .rotationEffect(.degrees(Double(index) * 45))
-            }
-            .onAppear {
-                // Infinite rotation: slower (12s) and continuous
-                ringRotation = 0
-                withAnimation(.linear(duration: 12).repeatForever(autoreverses: false)) {
-                    ringRotation = 360
-                }
-                // Pulsing dots animation
-                dotScale = 1.0
-                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-                    dotScale = 1.3
-                }
+                    .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(pulseScale + CGFloat(i) * 0.25)
+                    .opacity(pulseOpacity)
             }
             
-            Circle()
-                .fill(Color.white)
-                .frame(width: 80, height: 80)
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            // Main Button
+            ZStack {
+                // Button Background
+                Circle()
+                    .fill(.white)
+                    .frame(width: 90, height: 90)
+                    .shadow(color: .black.opacity(0.06), radius: 20, x: 0, y: 8)
+                
+                // Inner decorative ring
+                Circle()
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [.black.opacity(0.1), .clear, .black.opacity(0.1)]),
+                            center: .center
+                        ),
+                        lineWidth: 0.5
+                    )
+                    .frame(width: 82, height: 82)
+                    .rotationEffect(.degrees(ringRotation))
+                
+                Button(action: {
+                    let impact = UIImpactFeedbackGenerator(style: .heavy)
+                    impact.impactOccurred()
+                    showingCamera = true
+                }) {
+                    VStack(spacing: 6) {
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 42, weight: .thin))
+                            .foregroundStyle(.black)
+                        
+                        Text("SCAN")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .kerning(3)
+                            .foregroundColor(.black.opacity(0.3))
+                    }
+                }
+            }
+            .scaleEffect(dotScale)
+        }
+        .padding(.bottom, 10)
+        .onAppear {
+            // Initial states
+            pulseOpacity = 0.6
+            pulseScale = 1.0
             
-            Button(action: {
-                showingCamera = true
-            }) {
-                Image(systemName: "camera")
-                    .font(.system(size: 32, weight: .light))
-                    .foregroundColor(.black)
+            // Slow rotation for the inner ring
+            withAnimation(.linear(duration: 15).repeatForever(autoreverses: false)) {
+                ringRotation = 360
+            }
+            
+            // Breathing scale for the button
+            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                dotScale = 1.02
+            }
+            
+            // Pulsing animation
+            withAnimation(.easeOut(duration: 3).repeatForever(autoreverses: false)) {
+                pulseScale = 2.5
+                pulseOpacity = 0.0
             }
         }
-        .padding(.bottom, 20)
-        .padding(.top, 15)
     }
     
     
     private var contentList: some View {
-        LazyVStack(alignment: .leading, spacing: 20) {
+        LazyVStack(alignment: .leading, spacing: 40) {
             ForEach(store.sections) { sectionData in
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 24) {
                     if !sectionData.section.isEmpty {
                         Text(sectionData.section)
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                            .padding(.horizontal)
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.secondary.opacity(0.5))
+                            .kerning(3)
+                            .padding(.horizontal, 32)
                     }
                     
                     ForEach(sectionData.groups) { group in
@@ -290,13 +318,13 @@ struct HomeView: View {
                             GroupCard(group: group, groupingMode: store.groupingMode)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .padding(.horizontal)
+                        .padding(.horizontal, 24)
                     }
                 }
             }
         }
-        .padding(.top, 8)
-        .padding(.bottom, 100)
+        .padding(.top, 20)
+        .padding(.bottom, 160)
     }
     
     private var modeAndGroupingToggle: some View {
@@ -307,23 +335,23 @@ struct HomeView: View {
                     Button(action: {
                         let impact = UIImpactFeedbackGenerator(style: .medium)
                         impact.impactOccurred()
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             homeMode = mode
                         }
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: mode == .camera ? "camera.fill" : "map.fill")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.system(size: 11, weight: .bold))
                             
                             if homeMode == mode {
                                 Text(mode == .camera ? "相机" : "地图")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .font(.system(size: 12, weight: .bold, design: .rounded))
                                     .transition(.opacity.combined(with: .move(edge: .leading)))
                             }
                         }
                         .foregroundColor(homeMode == mode ? .white : .secondary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
                         .background(
                             ZStack {
                                 if homeMode == mode {
@@ -336,8 +364,8 @@ struct HomeView: View {
                     }
                 }
             }
-            .padding(4)
-            .background(Color.black.opacity(0.05))
+            .padding(3)
+            .background(Color.black.opacity(0.04))
             .clipShape(Capsule())
             
             Spacer()
@@ -362,32 +390,33 @@ struct HomeView: View {
                     .font(.system(size: 12, weight: .bold))
                     
                     Text(store.groupingMode == .location ? "按地点" : "按日期")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
                 }
                 .foregroundColor(.primary)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
                 .background(
                     Capsule()
                         .fill(Color.white)
-                        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
+                        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
                 )
                 .overlay(
                     Capsule()
-                        .stroke(Color.black.opacity(0.05), lineWidth: 0.5)
+                        .stroke(Color.black.opacity(0.03), lineWidth: 1)
                 )
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 28)
     }
     
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
+        let name = store.userName
         switch hour {
-        case 0..<6: return "凌晨好 :-)"
-        case 6..<12: return "早上好 :-)"
-        case 12..<18: return "下午好 :-)"
-        default: return "晚上好 :-)"
+        case 0..<6: return "凌晨好，\(name)"
+        case 6..<12: return "早上好，\(name)"
+        case 12..<18: return "下午好，\(name)"
+        default: return "晚上好，\(name)"
         }
     }
     
@@ -396,25 +425,15 @@ struct HomeView: View {
     }
 }
 
-struct ColorfulRing: View {
-    let colors: [Color] = [
-        Color(red: 1.0, green: 0.4, blue: 0.6),
-        Color(red: 0.4, green: 0.8, blue: 0.5),
-        Color(red: 1.0, green: 0.8, blue: 0.3),
-        Color(red: 0.5, green: 0.6, blue: 1.0),
-        Color(red: 0.8, green: 0.5, blue: 1.0)
-    ]
+struct BlurView: UIViewRepresentable {
+    var style: UIBlurEffect.Style = .systemMaterial
     
-    var body: some View {
-        ZStack {
-            ForEach(0..<colors.count, id: \.self) { index in
-                Circle()
-                    .trim(from: CGFloat(index) / CGFloat(colors.count),
-                          to: CGFloat(index + 1) / CGFloat(colors.count) + 0.01)
-                    .stroke(colors[index], style: StrokeStyle(lineWidth: 16, lineCap: .round))
-            }
-        }
-        .rotationEffect(.degrees(-90))
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        return UIVisualEffectView(effect: UIBlurEffect(style: style))
+    }
+    
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
+        uiView.effect = UIBlurEffect(style: style)
     }
 }
 
@@ -423,46 +442,105 @@ struct GroupCard: View {
     let groupingMode: GroupingMode
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Image(systemName: groupingMode == .location ? "mappin.circle.fill" : "calendar")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.primary)
+        VStack(alignment: .leading, spacing: 24) { // Increased from 20 to 24
+            // Header
+            HStack(alignment: .center, spacing: 12) {
+                // Color Indicator - more elegant pill shape
+                Capsule()
+                    .fill(group.color.opacity(0.8))
+                    .frame(width: 4, height: 16)
+                
+                VStack(alignment: .leading, spacing: 2) {
                     Text(group.title)
-                        .font(.system(.headline, design: .rounded))
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
+                    
+                    Text(group.subtitle)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary.opacity(0.7))
                 }
                 
-                Text(group.subtitle)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                Spacer()
+                
+                // Count Badge - more subtle
+                HStack(spacing: 4) {
+                    Text("\(group.items.count)")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    Text("ITEMS")
+                        .font(.system(size: 7, weight: .black))
+                }
+                .foregroundColor(.secondary.opacity(0.5))
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary.opacity(0.2))
             }
+            .padding(.horizontal, 4)
             
+            // Item Previews - more spacing between items
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(group.items.prefix(12)) { item in
-                        ZStack {
-                            if let gifPath = item.gifPath {
-                                NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
-                                    .frame(width: 72, height: 72)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            } else if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 72, height: 72)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                        }
-                        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                HStack(spacing: 16) { // Increased from 14 to 16
+                    ForEach(group.items.prefix(6)) { item in
+                        ItemPreview(item: item)
+                    }
+                    
+                    if group.items.count > 6 {
+                        MoreItemsView(count: group.items.count - 6)
                     }
                 }
+                .padding(.horizontal, 2)
             }
         }
-        .padding(20)
-        .background(group.color)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .padding(.vertical, 28)
+        .padding(.horizontal, 24)
+        .background(
+            RoundedRectangle(cornerRadius: 36)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.05), radius: 20, x: 0, y: 10)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 36)
+                .stroke(Color.black.opacity(0.04), lineWidth: 1)
+        )
+    }
+}
+
+struct ItemPreview: View {
+    let item: MagnetItem
+    
+    var body: some View {
+        ZStack {
+            if let gifPath = item.gifPath {
+                NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
+                    .frame(width: 80, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+            } else if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 80, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+            }
+        }
+    }
+}
+
+struct MoreItemsView: View {
+    let count: Int
+    
+    var body: some View {
+        VStack(spacing: 2) {
+            Text("+\(count)")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+            Text("MORE")
+                .font(.system(size: 7, weight: .black))
+        }
+        .foregroundColor(.secondary.opacity(0.4))
+        .frame(width: 80, height: 80)
+        .background(
+            RoundedRectangle(cornerRadius: 22)
+                .fill(Color.black.opacity(0.02))
+        )
     }
 }
 
