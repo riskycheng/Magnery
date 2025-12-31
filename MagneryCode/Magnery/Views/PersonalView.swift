@@ -8,6 +8,7 @@ struct PersonalView: View {
     @State private var showingCropView = false
     @State private var showingNameAlert = false
     @State private var newName = ""
+    @State private var showingCacheAlert = false
     
     var body: some View {
         NavigationStack {
@@ -25,7 +26,14 @@ struct PersonalView: View {
                         
                         settingsSection
                         
-                        Spacer(minLength: 120)
+                        Divider()
+                            .padding(.horizontal, 40)
+                            .padding(.top, 20)
+                            .opacity(0.3)
+                        
+                        footerSection
+                        
+                        Spacer(minLength: 120) // Increased to ensure visibility above tab bar
                     }
                 }
             }
@@ -194,45 +202,129 @@ struct PersonalView: View {
     }
     
     private var settingsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("设置与支持")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
+        VStack(alignment: .leading, spacing: 24) {
+            // Section 1: Settings
+            VStack(alignment: .leading, spacing: 12) {
+                Text("设置")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .padding(.horizontal)
+                
+                VStack(spacing: 1) {
+                    NavigationLink(destination: SettingsDetailView(title: "系统语言")) {
+                        settingsRow(icon: "globe", title: "系统语言", color: .blue, value: store.systemLanguage)
+                    }
+                    Divider().padding(.leading, 60)
+                    
+                    Button(action: {
+                        showingCacheAlert = true
+                    }) {
+                        settingsRow(icon: "trash.fill", title: "清理缓存", color: .red)
+                    }
+                    Divider().padding(.leading, 60)
+                    
+                    NavigationLink(destination: SettingsDetailView(title: "大模型选择")) {
+                        settingsRow(icon: "cpu.fill", title: "大模型选择", color: .purple)
+                    }
+                }
+                .background(Color.white)
+                .cornerRadius(20)
                 .padding(.horizontal)
-                .padding(.top, 8)
-            
-            VStack(spacing: 1) {
-                NavigationLink(destination: SettingsDetailView(title: "通知设置")) {
-                    settingsRow(icon: "bell.fill", title: "通知设置", color: .blue)
-                }
-                Divider().padding(.leading, 60)
-                
-                NavigationLink(destination: SettingsDetailView(title: "隐私与安全")) {
-                    settingsRow(icon: "shield.fill", title: "隐私与安全", color: .green)
-                }
-                Divider().padding(.leading, 60)
-                
-                NavigationLink(destination: SettingsDetailView(title: "云端备份")) {
-                    settingsRow(icon: "cloud.fill", title: "云端备份", color: .cyan)
-                }
-                Divider().padding(.leading, 60)
-                
-                NavigationLink(destination: SettingsDetailView(title: "帮助与反馈")) {
-                    settingsRow(icon: "questionmark.circle.fill", title: "帮助与反馈", color: .orange)
-                }
-                Divider().padding(.leading, 60)
-                
-                NavigationLink(destination: SettingsDetailView(title: "关于 Magnery")) {
-                    settingsRow(icon: "info.circle.fill", title: "关于 Magnery", color: .gray)
-                }
+                .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
             }
-            .background(Color.white)
-            .cornerRadius(20)
-            .padding(.horizontal)
-            .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+            
+            // Section 2: About Us
+            VStack(alignment: .leading, spacing: 12) {
+                Text("关于我们")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .padding(.horizontal)
+                
+                VStack(spacing: 1) {
+                    NavigationLink(destination: SettingsDetailView(title: "隐私政策")) {
+                        settingsRow(icon: "hand.raised.fill", title: "隐私政策", color: .green)
+                    }
+                    Divider().padding(.leading, 60)
+                    
+                    NavigationLink(destination: SettingsDetailView(title: "服务条款")) {
+                        settingsRow(icon: "doc.text.fill", title: "服务条款", color: .cyan)
+                    }
+                    Divider().padding(.leading, 60)
+                    
+                    NavigationLink(destination: SettingsDetailView(title: "常见问题")) {
+                        settingsRow(icon: "questionmark.circle.fill", title: "常见问题", color: .orange)
+                    }
+                    Divider().padding(.leading, 60)
+                    
+                    NavigationLink(destination: SettingsDetailView(title: "关于 Magnery")) {
+                        settingsRow(icon: "info.circle.fill", title: "关于 Magnery", color: .gray)
+                    }
+                    Divider().padding(.leading, 60)
+                    
+                    NavigationLink(destination: SettingsDetailView(title: "意见反馈")) {
+                        settingsRow(icon: "envelope.fill", title: "意见反馈", color: .indigo)
+                    }
+                }
+                .background(Color.white)
+                .cornerRadius(20)
+                .padding(.horizontal)
+                .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+            }
+        }
+        .alert("清理缓存", isPresented: $showingCacheAlert) {
+            Button("取消", role: .cancel) { }
+            Button("清理", role: .destructive) {
+                // Implement cache clearing logic here if needed
+            }
+        } message: {
+            Text("确定要清理应用缓存吗？这将释放存储空间。")
         }
     }
     
-    private func settingsRow(icon: String, title: String, color: Color) -> some View {
+    private var footerSection: some View {
+        VStack(spacing: 20) {
+            // App Logo
+            if let icon = UIImage(named: "AppIcon") ?? UIImage(named: "AppLogo") {
+                Image(uiImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 80, height: 80)
+                    .cornerRadius(20)
+            } else {
+                // Fallback to a castle-like icon if AppIcon isn't available
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.gray.opacity(0.1))
+                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+                    
+                    Image(systemName: "fort.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.primary.opacity(0.6))
+                }
+                .frame(width: 80, height: 80)
+            }
+            
+            VStack(spacing: 8) {
+                VStack(spacing: 4) {
+                    Text("Enjoy collections in")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary.opacity(0.8))
+                    
+                    Text("Mangery")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary.opacity(0.9))
+                }
+                
+                Text("Copyright @2026 Magnery")
+                    .font(.system(size: 13, design: .rounded))
+                    .foregroundColor(.secondary.opacity(0.5))
+            }
+            .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, 40)
+        .padding(.bottom, 20)
+    }
+    
+    private func settingsRow(icon: String, title: String, color: Color, value: String? = nil) -> some View {
         HStack(spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
@@ -248,6 +340,13 @@ struct PersonalView: View {
                 .foregroundColor(.primary)
             
             Spacer()
+            
+            if let value = value {
+                Text(value)
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                    .padding(.trailing, 4)
+            }
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .semibold))

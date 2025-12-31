@@ -17,15 +17,22 @@ class MagnetStore: ObservableObject {
     @Published var userName: String = "收藏家"
     @Published var userAvatarPath: String? = nil
     
+    // Settings
+    @Published var systemLanguage: String = "简体中文"
+    @Published var captionModel: String = "通用"
+    @Published var dialogueModel: String = "标准"
+    
     // Cache for grouped sections to improve performance
     @Published var sections: [SectionData] = []
     
     private let saveKey = "SavedMagnets"
     private let userKey = "UserProfile"
+    private let settingsKey = "AppSettings"
     
     init() {
         loadMagnets()
         loadUserProfile()
+        loadSettings()
         updateSections()
     }
     
@@ -39,6 +46,23 @@ class MagnetStore: ObservableObject {
             userName = profile["name"] as? String ?? "收藏家"
             let avatar = profile["avatar"] as? String ?? ""
             userAvatarPath = avatar.isEmpty ? nil : avatar
+        }
+    }
+    
+    func saveSettings() {
+        let settings = [
+            "language": systemLanguage,
+            "captionModel": captionModel,
+            "dialogueModel": dialogueModel
+        ]
+        UserDefaults.standard.set(settings, forKey: settingsKey)
+    }
+    
+    private func loadSettings() {
+        if let settings = UserDefaults.standard.dictionary(forKey: settingsKey) {
+            systemLanguage = settings["language"] as? String ?? "简体中文"
+            captionModel = settings["captionModel"] as? String ?? "通用"
+            dialogueModel = settings["dialogueModel"] as? String ?? "标准"
         }
     }
     
