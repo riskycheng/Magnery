@@ -4,6 +4,7 @@ import UIKit
 struct CropView: View {
     @Environment(\.dismiss) var dismiss
     let originalImage: UIImage
+    var isAvatarMode: Bool = false
     var onCrop: (UIImage) -> Void
     
     @State private var scale: CGFloat = 1.0
@@ -80,7 +81,7 @@ struct CropView: View {
                     
                     Spacer()
                     
-                    Text("编辑图片")
+                    Text(isAvatarMode ? "编辑头像" : "编辑图片")
                         .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .kerning(1)
@@ -103,11 +104,13 @@ struct CropView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 15)
-                .padding(.bottom, 15)
-                .background(.ultraThinMaterial.opacity(0.5))
-                .background(Color.black.opacity(0.4))
-                .zIndex(10) // Ensure top bar is always on top of the scaled image
+                .padding(.vertical, 15)
+                .background(
+                    Color.black.opacity(0.4)
+                        .background(.ultraThinMaterial.opacity(0.5))
+                        .ignoresSafeArea(edges: .top)
+                )
+                .zIndex(10)
                 
                 // Main Editing Area
                 GeometryReader { geometry in
@@ -154,10 +157,18 @@ struct CropView: View {
                             .mask(
                                 ZStack {
                                     Rectangle()
-                                    Rectangle()
-                                        .frame(width: cropRect.width, height: cropRect.height)
-                                        .offset(x: cropRect.midX - geometry.size.width/2, y: cropRect.midY - geometry.size.height/2)
-                                        .blendMode(.destinationOut)
+                                    
+                                    if isAvatarMode {
+                                        Circle()
+                                            .frame(width: cropRect.width, height: cropRect.height)
+                                            .offset(x: cropRect.midX - geometry.size.width/2, y: cropRect.midY - geometry.size.height/2)
+                                            .blendMode(.destinationOut)
+                                    } else {
+                                        Rectangle()
+                                            .frame(width: cropRect.width, height: cropRect.height)
+                                            .offset(x: cropRect.midX - geometry.size.width/2, y: cropRect.midY - geometry.size.height/2)
+                                            .blendMode(.destinationOut)
+                                    }
                                 }
                             )
                             .allowsHitTesting(false)
@@ -165,11 +176,16 @@ struct CropView: View {
                         // Grid/Border
                         ZStack {
                             // Border
-                            Rectangle()
-                                .stroke(Color.white.opacity(0.8), lineWidth: 1)
+                            if isAvatarMode {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.8), lineWidth: 1)
+                            } else {
+                                Rectangle()
+                                    .stroke(Color.white.opacity(0.8), lineWidth: 1)
+                            }
                             
                             // 3x3 Grid
-                            if isInteracting {
+                            if isInteracting && !isAvatarMode {
                                 GridLines()
                                     .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
                             }
@@ -179,10 +195,15 @@ struct CropView: View {
                         .allowsHitTesting(false)
                         
                         // Corner indicators (Draggable)
-                        cropCorners(in: geometry.size)
+                        if !isAvatarMode {
+                            cropCorners(in: geometry.size)
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onAppear {
+                        if isAvatarMode {
+                            selectedAspectRatio = .square
+                        }
                         containerSize = geometry.size
                         initializeCropRect(in: geometry.size)
                     }
@@ -278,38 +299,40 @@ struct CropView: View {
                     .background(Color.white.opacity(0.03))
                     
                     // Aspect Ratio Selector
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 22) {
-                            ForEach(AspectRatio.allCases, id: \.self) { ratio in
-                                Button(action: {
-                                    let impact = UIImpactFeedbackGenerator(style: .light)
-                                    impact.impactOccurred()
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        selectedAspectRatio = ratio
-                                    }
-                                }) {
-                                    VStack(spacing: 6) {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 4)
-                                                .stroke(selectedAspectRatio == ratio ? Color.orange : Color.white.opacity(0.3), lineWidth: 1.5)
-                                                .frame(width: 22, height: 22)
+                    if !isAvatarMode {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 22) {
+                                ForEach(AspectRatio.allCases, id: \.self) { ratio in
+                                    Button(action: {
+                                        let impact = UIImpactFeedbackGenerator(style: .light)
+                                        impact.impactOccurred()
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            selectedAspectRatio = ratio
+                                        }
+                                    }) {
+                                        VStack(spacing: 6) {
+                                            ZStack {
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .stroke(selectedAspectRatio == ratio ? Color.orange : Color.white.opacity(0.3), lineWidth: 1.5)
+                                                    .frame(width: 22, height: 22)
+                                                
+                                                Image(systemName: ratio.icon)
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(selectedAspectRatio == ratio ? .orange : .white.opacity(0.6))
+                                            }
                                             
-                                            Image(systemName: ratio.icon)
-                                                .font(.system(size: 10))
+                                            Text(ratio.rawValue)
+                                                .font(.system(size: 10, weight: selectedAspectRatio == ratio ? .bold : .medium))
                                                 .foregroundColor(selectedAspectRatio == ratio ? .orange : .white.opacity(0.6))
                                         }
-                                        
-                                        Text(ratio.rawValue)
-                                            .font(.system(size: 10, weight: selectedAspectRatio == ratio ? .bold : .medium))
-                                            .foregroundColor(selectedAspectRatio == ratio ? .orange : .white.opacity(0.6))
                                     }
                                 }
                             }
+                            .padding(.horizontal, 25)
+                            .padding(.top, 4) // Prevent truncation
                         }
-                        .padding(.horizontal, 25)
-                        .padding(.top, 4) // Prevent truncation
+                        .padding(.vertical, 12)
                     }
-                    .padding(.vertical, 12)
                     
                     // Toolbar
                     HStack {
@@ -358,11 +381,14 @@ struct CropView: View {
                     }
                     .foregroundColor(.white)
                     .padding(.top, 8)
-                    .padding(.bottom, (UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 20) > 0 ? 10 : 20)
+                    .padding(.bottom, 10)
                 }
-                .background(.ultraThinMaterial.opacity(0.8))
-                .background(Color.black.opacity(0.6))
-                .zIndex(10) // Ensure bottom controls are always on top
+                .background(
+                    Color.black.opacity(0.6)
+                        .background(.ultraThinMaterial.opacity(0.8))
+                        .ignoresSafeArea(edges: .bottom)
+                )
+                .zIndex(10)
                 .overlay(
                     Rectangle()
                         .fill(Color.white.opacity(0.05))

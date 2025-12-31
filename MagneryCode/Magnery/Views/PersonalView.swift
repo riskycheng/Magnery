@@ -32,19 +32,30 @@ struct PersonalView: View {
             .setTabBarVisibility(true)
             .navigationBarTitleDisplayMode(.inline)
             .onChange(of: selectedItem) { newItem in
+                guard let newItem = newItem else { return }
                 Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        await MainActor.run {
-                            selectedImage = image
-                            showingCropView = true
+                    do {
+                        if let data = try await newItem.loadTransferable(type: Data.self),
+                           let image = UIImage(data: data) {
+                            await MainActor.run {
+                                selectedImage = image
+                                showingCropView = true
+                                // Reset selection so it can be triggered again
+                                selectedItem = nil
+                            }
+                        } else {
+                            print("Failed to load image data")
+                            await MainActor.run { selectedItem = nil }
                         }
+                    } catch {
+                        print("Error loading image: \(error)")
+                        await MainActor.run { selectedItem = nil }
                     }
                 }
             }
             .fullScreenCover(isPresented: $showingCropView) {
                 if let image = selectedImage {
-                    CropView(originalImage: image) { croppedImage in
+                    CropView(originalImage: image, isAvatarMode: true) { croppedImage in
                         saveAvatar(croppedImage)
                     }
                 }
@@ -190,15 +201,29 @@ struct PersonalView: View {
                 .padding(.top, 8)
             
             VStack(spacing: 1) {
-                settingsRow(icon: "bell.fill", title: "通知设置", color: .blue)
+                NavigationLink(destination: SettingsDetailView(title: "通知设置")) {
+                    settingsRow(icon: "bell.fill", title: "通知设置", color: .blue)
+                }
                 Divider().padding(.leading, 60)
-                settingsRow(icon: "shield.fill", title: "隐私与安全", color: .green)
+                
+                NavigationLink(destination: SettingsDetailView(title: "隐私与安全")) {
+                    settingsRow(icon: "shield.fill", title: "隐私与安全", color: .green)
+                }
                 Divider().padding(.leading, 60)
-                settingsRow(icon: "cloud.fill", title: "云端备份", color: .cyan)
+                
+                NavigationLink(destination: SettingsDetailView(title: "云端备份")) {
+                    settingsRow(icon: "cloud.fill", title: "云端备份", color: .cyan)
+                }
                 Divider().padding(.leading, 60)
-                settingsRow(icon: "questionmark.circle.fill", title: "帮助与反馈", color: .orange)
+                
+                NavigationLink(destination: SettingsDetailView(title: "帮助与反馈")) {
+                    settingsRow(icon: "questionmark.circle.fill", title: "帮助与反馈", color: .orange)
+                }
                 Divider().padding(.leading, 60)
-                settingsRow(icon: "info.circle.fill", title: "关于 Magnery", color: .gray)
+                
+                NavigationLink(destination: SettingsDetailView(title: "关于 Magnery")) {
+                    settingsRow(icon: "info.circle.fill", title: "关于 Magnery", color: .gray)
+                }
             }
             .background(Color.white)
             .cornerRadius(20)
@@ -220,6 +245,7 @@ struct PersonalView: View {
             
             Text(title)
                 .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.primary)
             
             Spacer()
             
@@ -229,6 +255,7 @@ struct PersonalView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .contentShape(Rectangle())
     }
     
     private var uniqueLocationsCount: Int {
