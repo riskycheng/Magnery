@@ -20,6 +20,11 @@ struct HomeView: View {
     @State private var hasTriggeredHaptic = false
     @State private var selectedGroupForNavigation: MagnetGroup?
     @State private var lastAddedIdForNavigation: UUID?
+    @State private var rippleScale: CGFloat = 1.0
+    @State private var rippleOpacity: Double = 0.0
+    @State private var bgRippleLocation: CGPoint = .zero
+    @State private var bgRippleScale: CGFloat = 1.0
+    @State private var bgRippleOpacity: Double = 0.0
     
     private let collapsedThreshold: CGFloat = 200
     private let maxHeaderHeight: CGFloat = 360
@@ -233,57 +238,90 @@ struct HomeView: View {
     
     private var cameraButton: some View {
         ZStack {
+            // Background Tap Area for "Water Surface" ripples
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { location in
+                    triggerBackgroundRipple(at: location)
+                }
+            
             // Dynamic Pulsing Rings - Staggered and more pronounced
             ForEach(0..<3) { i in
                 Circle()
                     .stroke(Color.black.opacity(0.06), lineWidth: 1)
-                    .frame(width: 100, height: 100)
+                    .frame(width: 120, height: 120)
                     .scaleEffect(pulseScale + CGFloat(i) * 0.5)
                     .opacity(pulseOpacity * (1.0 - Double(i) * 0.3))
             }
             
+            // Interactive Water Ripple Effect (Central)
+            ForEach(0..<3) { i in
+                Circle()
+                    .stroke(Color.black.opacity(0.15), lineWidth: 1.5)
+                    .frame(width: 130, height: 130)
+                    .scaleEffect(rippleScale + CGFloat(i) * 0.2)
+                    .opacity(rippleOpacity * (1.0 - Double(i) * 0.3))
+            }
+            
+            // Background Ripple (at touch point)
+            ZStack {
+                ForEach(0..<2) { i in
+                    Circle()
+                        .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                        .frame(width: 40, height: 40)
+                        .scaleEffect(bgRippleScale + CGFloat(i) * 0.4)
+                        .opacity(bgRippleOpacity * (1.0 - Double(i) * 0.5))
+                }
+            }
+            .position(bgRippleLocation)
+            
             Button(action: {
+                triggerRippleEffect()
                 let impact = UIImpactFeedbackGenerator(style: .heavy)
                 impact.impactOccurred()
-                showingCamera = true
+                
+                // Guaranteed minimum animation time (0.6s) before transition
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    showingCamera = true
+                }
             }) {
                 ZStack {
-                    // Main Button Body
+                    // Main Button Body - Enlarged
                     Circle()
                         .fill(.white)
-                        .frame(width: 110, height: 110)
-                        .shadow(color: .black.opacity(0.08), radius: 30, x: 0, y: 15)
+                        .frame(width: 130, height: 130)
+                        .shadow(color: .black.opacity(0.08), radius: 35, x: 0, y: 18)
                     
-                    // Rotating Focus Ring - Adds "Mechanical" feel
+                    // Rotating Focus Ring - Enlarged
                     Circle()
                         .trim(from: 0, to: 0.3)
                         .stroke(
                             LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .top, endPoint: .bottom),
-                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                         )
-                        .frame(width: 80, height: 80)
+                        .frame(width: 100, height: 100)
                         .rotationEffect(.degrees(ringRotation))
                     
                     Circle()
                         .trim(from: 0.5, to: 0.8)
                         .stroke(
                             LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .bottom, endPoint: .top),
-                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                         )
-                        .frame(width: 80, height: 80)
+                        .frame(width: 100, height: 100)
                         .rotationEffect(.degrees(-ringRotation * 0.5))
                     
-                    // Minimalist Viewfinder Icon
+                    // Minimalist Viewfinder Icon - Enlarged
                     ZStack {
                         Image(systemName: "viewfinder")
-                            .font(Font.system(size: 42, weight: .light))
+                            .font(Font.system(size: 52, weight: .light))
                             .foregroundColor(.black.opacity(0.8))
-                            .scaleEffect(1.0 + Double(dotScale - 1.0) * 2.0) // Viewfinder reacts more to breathing
+                            .scaleEffect(1.0 + Double(dotScale - 1.0) * 2.0)
                         
                         Circle()
                             .fill(.black)
-                            .frame(width: 6, height: 6)
-                            .opacity(pulseOpacity > 0.2 ? 1 : 0.5) // Blinking center dot
+                            .frame(width: 8, height: 8)
+                            .opacity(pulseOpacity > 0.2 ? 1 : 0.5)
                     }
                 }
             }
@@ -438,6 +476,30 @@ struct HomeView: View {
     
     private var uniqueLocationsCount: Int {
         Set(store.magnets.map { $0.location }).count
+    }
+    
+    private func triggerRippleEffect() {
+        rippleScale = 1.0
+        rippleOpacity = 0.8
+        
+        withAnimation(.easeOut(duration: 0.8)) {
+            rippleScale = 3.5
+            rippleOpacity = 0.0
+        }
+    }
+    
+    private func triggerBackgroundRipple(at location: CGPoint) {
+        bgRippleLocation = location
+        bgRippleScale = 1.0
+        bgRippleOpacity = 0.6
+        
+        let impact = UIImpactFeedbackGenerator(style: .light)
+        impact.impactOccurred(intensity: 0.4)
+        
+        withAnimation(.easeOut(duration: 1.0)) {
+            bgRippleScale = 6.0
+            bgRippleOpacity = 0.0
+        }
     }
 }
 
