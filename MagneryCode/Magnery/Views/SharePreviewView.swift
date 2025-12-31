@@ -114,7 +114,7 @@ struct SharePreviewView: View {
         
         for template in ShareTemplate.allCases {
             DispatchQueue.global(qos: .userInitiated).async {
-                let generated = ShareImageHelper.generateShareImage(for: originalImage, magnetName: item.name, template: template)
+                let generated = ShareImageHelper.generateShareImage(for: originalImage, item: item, template: template)
                 DispatchQueue.main.async {
                     self.processedImages[template] = generated
                 }
