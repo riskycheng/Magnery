@@ -64,53 +64,55 @@ struct CropView: View {
     }
     
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Top Bar
-                HStack {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .bold))
+        GeometryReader { mainGeo in
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Top Bar
+                    HStack {
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(width: 36, height: 36)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                        
+                        Spacer()
+                        
+                        Text(isAvatarMode ? "编辑头像" : "编辑图片")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
-                            .frame(width: 36, height: 36)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
+                            .kerning(1)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            cropImage()
+                        }) {
+                            Text("完成")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 8)
+                                .background(Color.orange)
+                                .clipShape(Capsule())
+                                .shadow(color: .orange.opacity(0.3), radius: 10, x: 0, y: 4)
+                        }
                     }
-                    
-                    Spacer()
-                    
-                    Text(isAvatarMode ? "编辑头像" : "编辑图片")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .kerning(1)
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        cropImage()
-                    }) {
-                        Text("完成")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(Color.orange)
-                            .clipShape(Capsule())
-                            .shadow(color: .orange.opacity(0.3), radius: 10, x: 0, y: 4)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 15)
-                .background(
-                    Color.black.opacity(0.4)
-                        .background(.ultraThinMaterial.opacity(0.5))
-                        .ignoresSafeArea(edges: .top)
-                )
-                .zIndex(10)
+                    .padding(.horizontal, 20)
+                    .padding(.top, max(mainGeo.safeAreaInsets.top, 44) + 5)
+                    .padding(.bottom, 15)
+                    .background(
+                        Color.black.opacity(0.4)
+                            .background(.ultraThinMaterial.opacity(0.5))
+                            .ignoresSafeArea(edges: .top)
+                    )
+                    .zIndex(10)
                 
                 // Main Editing Area
                 GeometryReader { geometry in
@@ -381,7 +383,7 @@ struct CropView: View {
                     }
                     .foregroundColor(.white)
                     .padding(.top, 8)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, max(mainGeo.safeAreaInsets.bottom, 20))
                 }
                 .background(
                     Color.black.opacity(0.6)
@@ -398,7 +400,8 @@ struct CropView: View {
             }
         }
     }
-    
+}
+
     private func startInteracting() {
         if !isInteracting {
             withAnimation(.easeIn(duration: 0.2)) {
