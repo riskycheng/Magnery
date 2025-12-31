@@ -49,7 +49,7 @@ struct HomeView: View {
                                 .opacity(homeMode == .map ? 1 : 0)
                                 .scaleEffect(homeMode == .map ? 1 : 0.9)
                         }
-                        .frame(height: homeMode == .camera ? 180 : 260) 
+                        .frame(height: 280) 
                         .padding(.top, 100) 
                         .opacity(visualProgress)
                         .scaleEffect(0.85 + (0.15 * visualProgress))
@@ -116,7 +116,7 @@ struct HomeView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .center, spacing: verticalSpacing) {
                     Text(greeting)
-                        .font(.system(size: titleSize, weight: .bold, design: .rounded))
+                        .font(Font.system(size: titleSize, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                         .frame(maxWidth: .infinity, alignment: progress > 0.5 ? .center : .leading)
                     
@@ -129,7 +129,7 @@ struct HomeView: View {
                                 .foregroundColor(.primary)
                             Text("个冰箱贴")
                         }
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(Font.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary.opacity(0.8))
                         .opacity(Double(max(0, (progress - 0.5) * 2)))
                         
@@ -137,12 +137,12 @@ struct HomeView: View {
                         HStack(spacing: 8) {
                             HStack(spacing: 4) {
                                 Image(systemName: "square.grid.2x2.fill")
-                                    .font(.system(size: 10))
+                                    .font(Font.system(size: 10))
                                 Text("\(store.magnets.count)")
                                     .fontWeight(.bold)
                             }
                         }
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(Font.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary)
                         .opacity(Double(max(0, (0.5 - progress) * 2)))
                     }
@@ -155,22 +155,28 @@ struct HomeView: View {
                         impact.impactOccurred()
                         showingCamera = true 
                     }) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 14, weight: .light))
-                            .foregroundColor(.primary)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                Circle()
-                                    .fill(.white)
-                                    .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-                            )
+                        ZStack {
+                            Image(systemName: "viewfinder")
+                                .font(Font.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                            
+                            Circle()
+                                .fill(.primary)
+                                .frame(width: 4, height: 4)
+                        }
+                        .frame(width: 36, height: 36)
+                        .background(
+                            Circle()
+                                .fill(.white)
+                                .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+                        )
                     }
                     .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 28)
-            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (15 * progress))
-            .padding(.bottom, 12 + (8 * progress))
+            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (15.0 * progress))
+            .padding(.bottom, 12.0 + (8.0 * progress))
             .background(
                 ZStack {
                     if isDocked {
@@ -215,7 +221,7 @@ struct HomeView: View {
     private var mapViewContainer: some View {
         MapView()
             .frame(maxWidth: .infinity)
-            .frame(height: 240)
+            .frame(height: 280)
             .clipShape(RoundedRectangle(cornerRadius: 32))
             .overlay(
                 RoundedRectangle(cornerRadius: 32)
@@ -223,79 +229,88 @@ struct HomeView: View {
             )
             .shadow(color: .black.opacity(0.06), radius: 25, x: 0, y: 12)
             .padding(.horizontal, 24)
-            .padding(.bottom, 10)
     }
     
     private var cameraButton: some View {
         ZStack {
-            // Pulsing rings
-            ForEach(0..<2) { i in
+            // Dynamic Pulsing Rings - Staggered and more pronounced
+            ForEach(0..<3) { i in
                 Circle()
-                    .stroke(Color.black.opacity(0.08), lineWidth: 0.5)
-                    .frame(width: 80, height: 80)
-                    .scaleEffect(pulseScale + CGFloat(i) * 0.25)
-                    .opacity(pulseOpacity)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                    .frame(width: 100, height: 100)
+                    .scaleEffect(pulseScale + CGFloat(i) * 0.5)
+                    .opacity(pulseOpacity * (1.0 - Double(i) * 0.3))
             }
             
-            // Main Button
-            ZStack {
-                // Button Background
-                Circle()
-                    .fill(.white)
-                    .frame(width: 90, height: 90)
-                    .shadow(color: .black.opacity(0.06), radius: 20, x: 0, y: 8)
-                
-                // Inner decorative ring
-                Circle()
-                    .stroke(
-                        AngularGradient(
-                            gradient: Gradient(colors: [.black.opacity(0.1), .clear, .black.opacity(0.1)]),
-                            center: .center
-                        ),
-                        lineWidth: 0.5
-                    )
-                    .frame(width: 82, height: 82)
-                    .rotationEffect(.degrees(ringRotation))
-                
-                Button(action: {
-                    let impact = UIImpactFeedbackGenerator(style: .heavy)
-                    impact.impactOccurred()
-                    showingCamera = true
-                }) {
-                    VStack(spacing: 6) {
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 42, weight: .thin))
-                            .foregroundStyle(.black)
+            Button(action: {
+                let impact = UIImpactFeedbackGenerator(style: .heavy)
+                impact.impactOccurred()
+                showingCamera = true
+            }) {
+                ZStack {
+                    // Main Button Body
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 110, height: 110)
+                        .shadow(color: .black.opacity(0.08), radius: 30, x: 0, y: 15)
+                    
+                    // Rotating Focus Ring - Adds "Mechanical" feel
+                    Circle()
+                        .trim(from: 0, to: 0.3)
+                        .stroke(
+                            LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .top, endPoint: .bottom),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                        )
+                        .frame(width: 80, height: 80)
+                        .rotationEffect(.degrees(ringRotation))
+                    
+                    Circle()
+                        .trim(from: 0.5, to: 0.8)
+                        .stroke(
+                            LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .bottom, endPoint: .top),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                        )
+                        .frame(width: 80, height: 80)
+                        .rotationEffect(.degrees(-ringRotation * 0.5))
+                    
+                    // Minimalist Viewfinder Icon
+                    ZStack {
+                        Image(systemName: "viewfinder")
+                            .font(Font.system(size: 42, weight: .light))
+                            .foregroundColor(.black.opacity(0.8))
+                            .scaleEffect(1.0 + Double(dotScale - 1.0) * 2.0) // Viewfinder reacts more to breathing
                         
-                        Text("SCAN")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .kerning(3)
-                            .foregroundColor(.black.opacity(0.3))
+                        Circle()
+                            .fill(.black)
+                            .frame(width: 6, height: 6)
+                            .opacity(pulseOpacity > 0.2 ? 1 : 0.5) // Blinking center dot
                     }
                 }
             }
             .scaleEffect(dotScale)
         }
-        .padding(.bottom, 10)
         .onAppear {
-            // Initial states
-            pulseOpacity = 0.6
-            pulseScale = 1.0
+            // Faster, more obvious animations
             
-            // Slow rotation for the inner ring
-            withAnimation(.linear(duration: 15).repeatForever(autoreverses: false)) {
+            // 1. Continuous Rotation for Focus Rings
+            withAnimation(.linear(duration: 4).repeatForever(autoreverses: false)) {
                 ringRotation = 360
             }
             
-            // Breathing scale for the button
-            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                dotScale = 1.02
+            // 2. Pronounced Breathing for the Button
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                dotScale = 1.05
             }
             
-            // Pulsing animation
-            withAnimation(.easeOut(duration: 3).repeatForever(autoreverses: false)) {
+            // 3. Staggered Pulsing Waves
+            withAnimation(.easeOut(duration: 2.5).repeatForever(autoreverses: false)) {
                 pulseScale = 2.5
                 pulseOpacity = 0.0
+            }
+            
+            // Reset pulse opacity for the loop
+            Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { _ in
+                pulseOpacity = 0.6
             }
         }
     }
@@ -306,11 +321,12 @@ struct HomeView: View {
             ForEach(store.sections) { sectionData in
                 VStack(alignment: .leading, spacing: 24) {
                     if !sectionData.section.isEmpty {
-                        Text(sectionData.section)
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundColor(.secondary.opacity(0.5))
-                            .kerning(3)
-                            .padding(.horizontal, 32)
+                        Text(AttributedString(sectionData.section, attributes: AttributeContainer([
+                            .font: Font.system(size: 12, weight: .bold, design: .monospaced),
+                            .tracking: 3.0
+                        ])))
+                        .foregroundColor(.secondary.opacity(0.5))
+                        .padding(.horizontal, 32)
                     }
                     
                     ForEach(sectionData.groups) { group in
@@ -340,12 +356,12 @@ struct HomeView: View {
                         }
                     }) {
                         HStack(spacing: 6) {
-                            Image(systemName: mode == .camera ? "camera.fill" : "map.fill")
-                                .font(.system(size: 11, weight: .bold))
+                            Image(systemName: mode == .camera ? "viewfinder" : "map.fill")
+                                .font(Font.system(size: 11, weight: .bold))
                             
                             if homeMode == mode {
                                 Text(mode == .camera ? "相机" : "地图")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .font(Font.system(size: 12, weight: .bold, design: .rounded))
                                     .transition(.opacity.combined(with: .move(edge: .leading)))
                             }
                         }
@@ -387,10 +403,10 @@ struct HomeView: View {
                             .opacity(store.groupingMode == .time ? 1 : 0)
                             .scaleEffect(store.groupingMode == .time ? 1 : 0.5)
                     }
-                    .font(.system(size: 12, weight: .bold))
+                    .font(Font.system(size: 12, weight: .bold))
                     
                     Text(store.groupingMode == .location ? "按地点" : "按日期")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(Font.system(size: 12, weight: .bold, design: .rounded))
                 }
                 .foregroundColor(.primary)
                 .padding(.horizontal, 16)
@@ -452,11 +468,11 @@ struct GroupCard: View {
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(group.title)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(Font.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                     
                     Text(group.subtitle)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(Font.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary.opacity(0.7))
                 }
                 
@@ -465,14 +481,14 @@ struct GroupCard: View {
                 // Count Badge - more subtle
                 HStack(spacing: 4) {
                     Text("\(group.items.count)")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .font(Font.system(size: 12, weight: .bold, design: .monospaced))
                     Text("ITEMS")
-                        .font(.system(size: 7, weight: .black))
+                        .font(Font.system(size: 7, weight: .black))
                 }
                 .foregroundColor(.secondary.opacity(0.5))
                 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(Font.system(size: 10, weight: .bold))
                     .foregroundColor(.secondary.opacity(0.2))
             }
             .padding(.horizontal, 4)
@@ -531,9 +547,9 @@ struct MoreItemsView: View {
     var body: some View {
         VStack(spacing: 2) {
             Text("+\(count)")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(Font.system(size: 16, weight: .bold, design: .rounded))
             Text("MORE")
-                .font(.system(size: 7, weight: .black))
+                .font(Font.system(size: 7, weight: .black))
         }
         .foregroundColor(.secondary.opacity(0.4))
         .frame(width: 80, height: 80)
