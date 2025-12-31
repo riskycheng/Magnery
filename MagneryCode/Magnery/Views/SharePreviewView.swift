@@ -112,8 +112,11 @@ struct SharePreviewView: View {
     private func generateAllImages() {
         guard let originalImage = ImageManager.shared.loadImage(filename: item.imagePath) else { return }
         
+        // Use a serial queue to process images one by one to prevent memory spikes
+        let processingQueue = DispatchQueue(label: "com.magnery.share.processing", qos: .userInitiated)
+        
         for template in ShareTemplate.allCases {
-            DispatchQueue.global(qos: .userInitiated).async {
+            processingQueue.async {
                 let generated = ShareImageHelper.generateShareImage(for: originalImage, item: item, template: template)
                 DispatchQueue.main.async {
                     self.processedImages[template] = generated
