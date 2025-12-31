@@ -33,7 +33,7 @@ struct PersonalView: View {
                         
                         footerSection
                         
-                        Spacer(minLength: 120) // Increased to ensure visibility above tab bar
+                        Spacer(minLength: 80)
                     }
                 }
             }
@@ -280,47 +280,24 @@ struct PersonalView: View {
     }
     
     private var footerSection: some View {
-        VStack(spacing: 20) {
-            // App Logo
-            if let icon = UIImage(named: "AppIcon") ?? UIImage(named: "AppLogo") {
-                Image(uiImage: icon)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 80, height: 80)
-                    .cornerRadius(20)
-            } else {
-                // Fallback to a castle-like icon if AppIcon isn't available
-                ZStack {
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.gray.opacity(0.1))
-                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
-                    
-                    Image(systemName: "fort.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.primary.opacity(0.6))
-                }
-                .frame(width: 80, height: 80)
+        VStack(spacing: 8) {
+            VStack(spacing: 4) {
+                Text("Enjoy collections in")
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary.opacity(0.8))
+                
+                Text("Mangery")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary.opacity(0.9))
             }
             
-            VStack(spacing: 8) {
-                VStack(spacing: 4) {
-                    Text("Enjoy collections in")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundColor(.secondary.opacity(0.8))
-                    
-                    Text("Mangery")
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary.opacity(0.9))
-                }
-                
-                Text("Copyright @2026 Magnery")
-                    .font(.system(size: 13, design: .rounded))
-                    .foregroundColor(.secondary.opacity(0.5))
-            }
-            .multilineTextAlignment(.center)
+            Text("Copyright @2026 Magnery")
+                .font(.system(size: 13, design: .rounded))
+                .foregroundColor(.secondary.opacity(0.5))
         }
+        .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.top, 40)
+        .padding(.top, 30)
         .padding(.bottom, 20)
     }
     
