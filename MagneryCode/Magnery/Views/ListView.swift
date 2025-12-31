@@ -117,7 +117,6 @@ struct ListView: View {
     private func actionButtons(for item: MagnetItem) -> some View {
         VStack(spacing: 12) {
             shareButton(for: item)
-            downloadButton(for: item)
             deleteButton(for: item)
         }
         .offset(x: -8, y: -8)
@@ -136,22 +135,6 @@ struct ListView: View {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 20))
                         .foregroundColor(.blue)
-                )
-        }
-    }
-    
-    private func downloadButton(for item: MagnetItem) -> some View {
-        Button(action: {
-            itemToShare = item
-        }) {
-            Circle()
-                .fill(Color.white)
-                .frame(width: 44, height: 44)
-                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
-                .overlay(
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 20))
-                        .foregroundColor(.green)
                 )
         }
     }
