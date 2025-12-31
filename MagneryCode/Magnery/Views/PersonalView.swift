@@ -1,7 +1,13 @@
 import SwiftUI
+import PhotosUI
 
 struct PersonalView: View {
     @EnvironmentObject var store: MagnetStore
+    @State private var selectedItem: PhotosPickerItem? = nil
+    @State private var selectedImage: UIImage? = nil
+    @State private var showingCropView = false
+    @State private var showingNameAlert = false
+    @State private var newName = ""
     
     var body: some View {
         NavigationStack {
@@ -10,46 +16,194 @@ struct PersonalView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 24) {
-                        // Profile Header
-                        VStack(spacing: 16) {
-                            Circle()
-                                .fill(Color.orange.opacity(0.2))
-                                .frame(width: 100, height: 100)
-                                .overlay(
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.orange)
-                                )
-                                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
-                            
-                            VStack(spacing: 4) {
-                                Text("收藏家")
-                                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                                Text("已收藏 \(store.magnets.count) 个冰箱贴")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                        .padding(.top, 40)
+                    VStack(alignment: .leading, spacing: 24) {
+                        headerSection
                         
-                        // Settings Sections
-                        VStack(spacing: 16) {
-                            settingsRow(icon: "bell.fill", title: "通知设置", color: .blue)
-                            settingsRow(icon: "shield.fill", title: "隐私与安全", color: .green)
-                            settingsRow(icon: "cloud.fill", title: "云端备份", color: .cyan)
-                            settingsRow(icon: "questionmark.circle.fill", title: "帮助与反馈", color: .orange)
-                            settingsRow(icon: "info.circle.fill", title: "关于 Magnery", color: .gray)
-                        }
-                        .padding(.horizontal)
+                        profileSection
                         
-                        Spacer(minLength: 100)
+                        statsSection
+                        
+                        settingsSection
+                        
+                        Spacer(minLength: 120)
                     }
                 }
             }
             .setTabBarVisibility(true)
-            .navigationTitle("个人中心")
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: selectedItem) { newItem in
+                Task {
+                    if let data = try? await newItem?.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        await MainActor.run {
+                            selectedImage = image
+                            showingCropView = true
+                        }
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $showingCropView) {
+                if let image = selectedImage {
+                    CropView(originalImage: image) { croppedImage in
+                        saveAvatar(croppedImage)
+                    }
+                }
+            }
+            .alert("修改昵称", isPresented: $showingNameAlert) {
+                TextField("请输入新昵称", text: $newName)
+                Button("取消", role: .cancel) { }
+                Button("确定") {
+                    if !newName.isEmpty {
+                        store.userName = newName
+                        store.saveUserProfile()
+                    }
+                }
+            } message: {
+                Text("好的昵称能让大家更容易记住你")
+            }
+        }
+    }
+    
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("个人中心")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+            
+            Text("管理您的收藏与个人资料")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .padding(.horizontal)
+        .padding(.top, 20)
+    }
+    
+    private var profileSection: some View {
+        HStack(spacing: 20) {
+            // Avatar
+            PhotosPicker(selection: $selectedItem, matching: .images) {
+                ZStack {
+                    if let avatarPath = store.userAvatarPath,
+                       let image = ImageManager.shared.loadImage(filename: avatarPath) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        Circle()
+                            .fill(Color.orange.opacity(0.1))
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.orange)
+                    }
+                }
+                .frame(width: 100, height: 100)
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(Color.white, lineWidth: 4)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                .overlay(
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
+                        .offset(x: 35, y: 35)
+                )
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Button(action: {
+                    newName = store.userName
+                    showingNameAlert = true
+                }) {
+                    HStack {
+                        Text(store.userName)
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                    }
+                }
+                
+                Text("ID: \(abs(store.userName.hashValue % 1000000))")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal)
+    }
+    
+    private var statsSection: some View {
+        HStack(spacing: 16) {
+            NavigationLink(destination: ListView()) {
+                statCard(title: "已收藏", value: "\(store.magnets.count)", unit: "个", icon: "square.grid.2x2.fill", color: .orange)
+            }
+            
+            NavigationLink(destination: MapView()) {
+                statCard(title: "已点亮", value: "\(uniqueLocationsCount)", unit: "城", icon: "mappin.and.ellipse", color: .blue)
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    private func statCard(title: String, value: String, unit: String, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.gray.opacity(0.3))
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text(value)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                    Text(unit)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .cornerRadius(20)
+        .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+    }
+    
+    private var settingsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("设置与支持")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .padding(.horizontal)
+                .padding(.top, 8)
+            
+            VStack(spacing: 1) {
+                settingsRow(icon: "bell.fill", title: "通知设置", color: .blue)
+                Divider().padding(.leading, 60)
+                settingsRow(icon: "shield.fill", title: "隐私与安全", color: .green)
+                Divider().padding(.leading, 60)
+                settingsRow(icon: "cloud.fill", title: "云端备份", color: .cyan)
+                Divider().padding(.leading, 60)
+                settingsRow(icon: "questionmark.circle.fill", title: "帮助与反馈", color: .orange)
+                Divider().padding(.leading, 60)
+                settingsRow(icon: "info.circle.fill", title: "关于 Magnery", color: .gray)
+            }
+            .background(Color.white)
+            .cornerRadius(20)
+            .padding(.horizontal)
+            .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
         }
     }
     
@@ -71,12 +225,21 @@ struct PersonalView: View {
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.gray.opacity(0.5))
+                .foregroundColor(.gray.opacity(0.3))
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.02), radius: 5, x: 0, y: 2)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+    
+    private var uniqueLocationsCount: Int {
+        Set(store.magnets.map { $0.location }).count
+    }
+    
+    private func saveAvatar(_ image: UIImage) {
+        if let path = ImageManager.shared.saveImage(image) {
+            store.userAvatarPath = path
+            store.saveUserProfile()
+        }
     }
 }
 

@@ -14,15 +14,32 @@ class MagnetStore: ObservableObject {
     @Published var magnets: [MagnetItem] = []
     @Published var groupingMode: GroupingMode = .location
     @Published var lastAddedMagnetId: UUID?
+    @Published var userName: String = "收藏家"
+    @Published var userAvatarPath: String? = nil
     
     // Cache for grouped sections to improve performance
     @Published var sections: [SectionData] = []
     
     private let saveKey = "SavedMagnets"
+    private let userKey = "UserProfile"
     
     init() {
         loadMagnets()
+        loadUserProfile()
         updateSections()
+    }
+    
+    func saveUserProfile() {
+        let profile = ["name": userName, "avatar": userAvatarPath ?? ""]
+        UserDefaults.standard.set(profile, forKey: userKey)
+    }
+    
+    private func loadUserProfile() {
+        if let profile = UserDefaults.standard.dictionary(forKey: userKey) {
+            userName = profile["name"] as? String ?? "收藏家"
+            let avatar = profile["avatar"] as? String ?? ""
+            userAvatarPath = avatar.isEmpty ? nil : avatar
+        }
     }
     
     func addMagnet(_ magnet: MagnetItem) {
