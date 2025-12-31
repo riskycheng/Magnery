@@ -7,6 +7,13 @@ struct EllipsisButtonBoundsKey: PreferenceKey {
     }
 }
 
+struct ViewSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
 struct DetailView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var store: MagnetStore
@@ -17,6 +24,7 @@ struct DetailView: View {
     @State private var currentMagnet: MagnetItem
     @State private var groupItems: [MagnetItem] = []
     @State private var ellipsisButtonFrame: CGRect = .zero
+    @State private var menuSize: CGSize = CGSize(width: 60, height: 60)
     @State private var refreshTrigger: Bool = false
     @State private var showingDeleteConfirmation = false
     @State private var itemToShare: MagnetItem? = nil
@@ -134,9 +142,20 @@ struct DetailView: View {
             
             if showingEditMenu && ellipsisButtonFrame != .zero {
                 circularMenuButtons
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear
+                                .preference(key: ViewSizeKey.self, value: proxy.size)
+                        }
+                    )
+                    .onPreferenceChange(ViewSizeKey.self) { size in
+                        if size != .zero {
+                            menuSize = size
+                        }
+                    }
                     .position(
-                        x: ellipsisButtonFrame.maxX - 30,
-                        y: ellipsisButtonFrame.maxY + 70
+                        x: ellipsisButtonFrame.midX,
+                        y: ellipsisButtonFrame.maxY
                     )
                     .zIndex(999)
             }
