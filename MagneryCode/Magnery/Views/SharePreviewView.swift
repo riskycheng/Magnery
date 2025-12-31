@@ -110,14 +110,55 @@ struct SharePreviewView: View {
     }
     
     private func generateAllImages() {
-        guard let originalImage = ImageManager.shared.loadImage(filename: item.imagePath) else { return }
+        // Handle both local and remote images
+        if item.imagePath.hasPrefix("http") {
+            // Remote image
+            guard let url = URL(string: item.imagePath) else {
+                handleFailure()
+                return
+            }
+            
+            URLSession.shared.dataTask(with: url) { data, _, error in
+                if let data = data, let image = UIImage(data: data) {
+                    processImage(image)
+                } else {
+                    print("Error downloading image: \(error?.localizedDescription ?? "Unknown error")")
+                    handleFailure()
+                }
+            }.resume()
+        } else if let localImage = ImageManager.shared.loadImage(filename: item.imagePath) {
+            // Local image
+            processImage(localImage)
+        } else {
+            handleFailure()
+        }
+    }
+    
+    private func handleFailure() {
+        DispatchQueue.main.async {
+            // If we can't load the image, we should at least stop the loading state
+            // Maybe show an error or just dismiss
+            dismiss()
+        }
+    }
+    
+    private func processImage(_ originalImage: UIImage) {
+        // Pre-downscale once to save time and memory
+        let maxDimension: CGFloat = 1200
+        let scale = min(maxDimension / originalImage.size.width, maxDimension / originalImage.size.height, 1.0)
+        let targetSize = CGSize(width: originalImage.size.width * scale, height: originalImage.size.height * scale)
+        
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let downscaledImage = renderer.image { _ in
+            originalImage.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
         
         // Use a serial queue to process images one by one to prevent memory spikes
         let processingQueue = DispatchQueue(label: "com.magnery.share.processing", qos: .userInitiated)
         
         for template in ShareTemplate.allCases {
             processingQueue.async {
-                let generated = ShareImageHelper.generateShareImage(for: originalImage, item: item, template: template)
+                let generated = ShareImageHelper.generateShareImage(for: downscaledImage, item: item, template: template)
                 DispatchQueue.main.async {
                     self.processedImages[template] = generated
                 }

@@ -63,17 +63,7 @@ enum ShareTemplate: String, CaseIterable {
 }
 
 class ShareImageHelper {
-    static func generateShareImage(for originalImage: UIImage, item: MagnetItem, template: ShareTemplate = .classic) -> UIImage? {
-        // 0. Downscale image if too large to prevent OOM crashes
-        let maxDimension: CGFloat = 1200
-        let scale = min(maxDimension / originalImage.size.width, maxDimension / originalImage.size.height, 1.0)
-        let targetSize = CGSize(width: originalImage.size.width * scale, height: originalImage.size.height * scale)
-        
-        let renderer = UIGraphicsImageRenderer(size: targetSize)
-        let image = renderer.image { _ in
-            originalImage.draw(in: CGRect(origin: .zero, size: targetSize))
-        }
-        
+    static func generateShareImage(for image: UIImage, item: MagnetItem, template: ShareTemplate = .classic) -> UIImage? {
         let canvasSize: CGSize
         let padding: CGFloat = 60
         

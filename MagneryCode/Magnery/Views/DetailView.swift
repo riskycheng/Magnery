@@ -135,8 +135,8 @@ struct DetailView: View {
             if showingEditMenu && ellipsisButtonFrame != .zero {
                 circularMenuButtons
                     .position(
-                        x: ellipsisButtonFrame.midX - 25,
-                        y: ellipsisButtonFrame.midY + 105
+                        x: ellipsisButtonFrame.maxX - 30,
+                        y: ellipsisButtonFrame.maxY + 70
                     )
                     .zIndex(999)
             }
