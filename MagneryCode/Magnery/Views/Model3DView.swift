@@ -14,8 +14,26 @@ struct Model3DView: View {
     var body: some View {
         ZStack {
             if let scene = scene {
-                TransparentSceneView(scene: scene, cameraNode: cameraNode)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ZStack(alignment: .bottomLeading) {
+                    TransparentSceneView(scene: scene, cameraNode: cameraNode)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    
+                    // 3D Interaction Indicator
+                    HStack(spacing: 6) {
+                        Image(systemName: "move.3d")
+                        Text("3D 可旋转")
+                    }
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.2))
+                            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                    )
+                    .padding(20)
+                }
             } else if isLoading {
                 VStack(spacing: 12) {
                     ZStack {
@@ -195,10 +213,26 @@ struct Model3DView: View {
         // 4. Apply orientation adjustment
         // Based on logs: X=1.15, Y=0.21, Z=1.15. Model is lying flat on XZ plane.
         // We rotate it 90 degrees on X to stand it up.
-        // Try -90 first, if it's the back, we'll try +90.
         modelContainer.eulerAngles = SCNVector3(-Float.pi / 2, 0, 0)
         
-        // 5. Create and position the camera
+        // 5. Initial "Look Around" Animation
+        // Rotate left and right (Yaw) to show it's 3D
+        let rotateLeft = SCNAction.rotateBy(x: 0, y: -0.4, z: 0, duration: 0.8)
+        rotateLeft.timingMode = .easeInEaseOut
+        let rotateRight = SCNAction.rotateBy(x: 0, y: 0.8, z: 0, duration: 1.6)
+        rotateRight.timingMode = .easeInEaseOut
+        let rotateBack = SCNAction.rotateBy(x: 0, y: -0.4, z: 0, duration: 0.8)
+        rotateBack.timingMode = .easeInEaseOut
+        
+        let sequence = SCNAction.sequence([
+            SCNAction.wait(duration: 0.5),
+            rotateLeft,
+            rotateRight,
+            rotateBack
+        ])
+        modelContainer.runAction(sequence)
+        
+        // 6. Create and position the camera
         let camera = SCNCamera()
         camera.zNear = 0.01
         camera.zFar = Double(radius) * 100.0
@@ -210,7 +244,7 @@ struct Model3DView: View {
         newCameraNode.position = SCNVector3(x: 0, y: 0, z: radius * 1.3)
         scnScene.rootNode.addChildNode(newCameraNode)
         
-        // 6. Add basic lighting
+        // 7. Add basic lighting
         let ambientLightNode = SCNNode()
         ambientLightNode.light = SCNLight()
         ambientLightNode.light?.type = .ambient
