@@ -5,43 +5,70 @@ struct CommunityView: View {
     @StateObject private var communityService = CommunityService()
     @State private var isContentVisible = false
     @State private var selectedMagnet: MagnetItem?
+    @State private var scrollOffset: CGFloat = 0
+    @State private var initialOffset: CGFloat? = nil
+    @State private var isCollapsed = false
+    @State private var lastScrollUpdate: CGFloat = 0
+    private let scrollUpdateThreshold: CGFloat = 1
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(red: 0.95, green: 0.95, blue: 0.97)
-                    .ignoresSafeArea()
-                
-                if isContentVisible {
+            GeometryReader { outerGeo in
+                ZStack(alignment: .top) {
+                    Color(red: 0.95, green: 0.95, blue: 0.97)
+                        .ignoresSafeArea()
+                    
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            headerSection
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Spacer for the fixed header - further reduced
+                            Color.clear.frame(height: 90)
                             
-                            if let error = communityService.errorMessage {
-                                errorState(error)
-                            } else {
-                                contentGrid
+                            if isContentVisible {
+                                if let error = communityService.errorMessage {
+                                    errorState(error)
+                                        .padding(.top, 10)
+                                } else {
+                                    contentGrid
+                                        .padding(.top, 5)
+                                }
                             }
                         }
+                        .background(
+                            GeometryReader { geo in
+                                let offset = geo.frame(in: .global).minY - outerGeo.frame(in: .global).minY
+                                Color.clear
+                                    .onChange(of: offset) { newValue in
+                                        if initialOffset == nil {
+                                            initialOffset = newValue
+                                        }
+                                        let calibratedOffset = newValue - (initialOffset ?? newValue)
+                                        handleScroll(calibratedOffset)
+                                    }
+                            }
+                        )
                     }
+                    .opacity(isContentVisible ? 1 : 0)
                     .refreshable {
                         communityService.fetchCommunityContent()
                     }
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-                
-                // Central loading indicator for the very first fetch
-                if communityService.isLoading && communityService.popularMagnets.isEmpty {
-                    VStack(spacing: 15) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                        Text("正在探索社区...")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundColor(.secondary)
+                    
+                    // Fixed Header Layer
+                    headerLayer
+                        .zIndex(1)
+                    
+                    // Central loading indicator for the very first fetch
+                    if communityService.isLoading && communityService.popularMagnets.isEmpty {
+                        VStack(spacing: 15) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            Text("正在探索社区...")
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(red: 0.95, green: 0.95, blue: 0.97).opacity(0.8))
+                        .transition(.opacity)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(red: 0.95, green: 0.95, blue: 0.97).opacity(0.8))
-                    .transition(.opacity)
                 }
             }
             .setTabBarVisibility(true)
@@ -65,24 +92,107 @@ struct CommunityView: View {
         }
     }
     
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("社区精选")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                
-                if communityService.isLoading {
-                    ProgressView()
-                        .padding(.leading, 8)
+    private var headerLayer: some View {
+        let rawProgress = 1.0 + (scrollOffset / 100.0)
+        let progress = min(1.0, max(0.0, rawProgress))
+        let isDocked = scrollOffset < -60
+        
+        let titleSize = 18.0 + (16.0 * progress)
+        let verticalSpacing = 2.0 + (4.0 * progress)
+        
+        return VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: verticalSpacing) {
+                    ZStack {
+                        // Expanded Title (Leading)
+                        HStack(alignment: .center, spacing: 8) {
+                            Text("社区精选")
+                                .font(Font.system(size: titleSize, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                            
+                            if communityService.isLoading {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .opacity(Double(progress > 0.5 ? (progress - 0.5) * 2 : 0))
+                        .offset(x: (1.0 - progress) * 20)
+                        
+                        // Docked Title (Center)
+                        HStack(alignment: .center, spacing: 8) {
+                            Text("社区精选")
+                                .font(Font.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundColor(.primary)
+                            
+                            if communityService.isLoading {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .opacity(Double(progress < 0.5 ? (0.5 - progress) * 2 : 0))
+                        .offset(x: progress * -20)
+                    }
+                    
+                    ZStack {
+                        // Expanded Subtitle
+                        Text("探索来自全球收藏家的精致冰箱贴")
+                            .font(Font.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary.opacity(0.8))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .opacity(Double(progress > 0.5 ? (progress - 0.5) * 2 : 0))
+                        
+                        // Docked Subtitle
+                        Text("社区精选")
+                            .font(Font.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .opacity(Double(progress < 0.5 ? (0.5 - progress) * 2 : 0))
+                    }
                 }
+                .frame(maxWidth: .infinity)
             }
-            
-            Text("探索来自全球收藏家的精致冰箱贴")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+            .padding(.horizontal, 20)
+            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (6.0 * progress))
+            .padding(.bottom, 8.0 + (2.0 * progress))
+            .background(
+                ZStack {
+                    if isDocked {
+                        BlurView(style: .systemUltraThinMaterialLight)
+                            .ignoresSafeArea()
+                    } else {
+                        Color(red: 0.95, green: 0.95, blue: 0.97)
+                            .ignoresSafeArea()
+                    }
+                }
+            )
+            .overlay(
+                Rectangle()
+                    .fill(Color.black.opacity(0.05))
+                    .frame(height: 0.5)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .opacity(isDocked ? 1 : 0)
+            )
         }
-        .padding(.horizontal)
-        .padding(.top, 20)
+        .ignoresSafeArea(edges: .top)
+    }
+    
+    private func handleScroll(_ value: CGFloat) {
+        if abs(value - scrollOffset) < scrollUpdateThreshold {
+            return
+        }
+        
+        scrollOffset = value
+        
+        let threshold: CGFloat = -60
+        let newCollapsed = value < threshold
+        
+        if newCollapsed != isCollapsed {
+            isCollapsed = newCollapsed
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred(intensity: newCollapsed ? 0.8 : 0.5)
+        }
     }
     
     private var contentGrid: some View {

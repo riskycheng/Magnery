@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var pulseScale: CGFloat = 1.0
     @State private var pulseOpacity: Double = 0.0
     @State private var scrollOffset: CGFloat = 0
+    @State private var initialOffset: CGFloat? = nil
     @State private var isCollapsed = false
     @State private var lastScrollUpdate: CGFloat = 0
     @State private var homeMode: HomeMode = .camera
@@ -29,7 +30,7 @@ struct HomeView: View {
     
     private let collapsedThreshold: CGFloat = 200
     private let maxHeaderHeight: CGFloat = 360
-    private let scrollUpdateThreshold: CGFloat = 2  // Only update every 2 points for smoother animation
+    private let scrollUpdateThreshold: CGFloat = 1  // Reduced threshold
     
     private var visualProgress: CGFloat {
         let rawProgress = 1.0 + (scrollOffset / 150.0)
@@ -38,55 +39,61 @@ struct HomeView: View {
     
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                Color(red: 0.95, green: 0.95, blue: 0.97)
-                    .ignoresSafeArea()
-                
-                // Main scrollable content
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // Visual elements that scroll away (Camera Ring / Map)
-                        ZStack {
-                            cameraButton
-                                .opacity(homeMode == .camera ? 1 : 0)
-                                .scaleEffect(homeMode == .camera ? 1 : 0.9)
-                            
-                            mapViewContainer
-                                .opacity(homeMode == .map ? 1 : 0)
-                                .scaleEffect(homeMode == .map ? 1 : 0.9)
-                        }
-                        .frame(height: 280) 
-                        .padding(.top, 100) 
-                        .opacity(visualProgress)
-                        .scaleEffect(0.85 + (0.15 * visualProgress))
-                        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: homeMode)
-                        
+            GeometryReader { outerGeo in
+                ZStack(alignment: .top) {
+                    Color(red: 0.95, green: 0.95, blue: 0.97)
+                        .ignoresSafeArea()
+                    
+                    // Main scrollable content
+                    ScrollView {
                         VStack(spacing: 0) {
-                            // Mode and Grouping toggle
-                            modeAndGroupingToggle
-                                .padding(.top, 15)
-                                .padding(.bottom, 25)
+                            // Visual elements that scroll away (Camera Ring / Map)
+                            ZStack {
+                                cameraButton
+                                    .opacity(homeMode == .camera ? 1 : 0)
+                                    .scaleEffect(homeMode == .camera ? 1 : 0.9)
+                                
+                                mapViewContainer
+                                    .opacity(homeMode == .map ? 1 : 0)
+                                    .scaleEffect(homeMode == .map ? 1 : 0.9)
+                            }
+                            .frame(height: 280) 
+                            .padding(.top, 90) 
+                            .opacity(visualProgress)
+                            .scaleEffect(0.85 + (0.15 * visualProgress))
+                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: homeMode)
                             
-                            // Content list
-                            contentList
+                            VStack(spacing: 0) {
+                                // Mode and Grouping toggle
+                                modeAndGroupingToggle
+                                    .padding(.top, 15)
+                                    .padding(.bottom, 25)
+                                
+                                // Content list
+                                contentList
+                            }
                         }
+                        .background(
+                            GeometryReader { geo in
+                                let offset = geo.frame(in: .global).minY - outerGeo.frame(in: .global).minY
+                                Color.clear
+                                    .onAppear {
+                                        if initialOffset == nil {
+                                            initialOffset = offset
+                                        }
+                                    }
+                                    .onChange(of: offset) { newValue in
+                                        let calibratedOffset = newValue - (initialOffset ?? newValue)
+                                        handleScroll(calibratedOffset)
+                                    }
+                            }
+                        )
                     }
-                    .background(
-                        GeometryReader { geometry in
-                            let offset = geometry.frame(in: .named("scroll")).minY
-                            Color.clear
-                                .preference(key: ScrollOffsetPreferenceKey.self, value: offset)
-                        }
-                    )
+                    
+                    // Fixed Header Layer (Text content that docks)
+                    headerLayer
+                        .zIndex(1)
                 }
-                .coordinateSpace(name: "scroll")
-                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                    handleScroll(value)
-                }
-                
-                // Fixed Header Layer (Text content that docks)
-                headerLayer
-                    .zIndex(1)
             }
             .setTabBarVisibility(true)
             .fullScreenCover(isPresented: $showingCamera) {
@@ -111,20 +118,33 @@ struct HomeView: View {
     }
     
     private var headerLayer: some View {
-        let rawProgress = 1.0 + (scrollOffset / 100.0)
+        let rawProgress = 1.0 + (scrollOffset / 120.0)
         let progress = min(1.0, max(0.0, rawProgress))
-        let isDocked = scrollOffset < -80
+        let isDocked = scrollOffset < -70
         
-        let titleSize = 16.0 + (12.0 * progress)
-        let verticalSpacing = 1.0 + (4.0 * progress)
+        let titleSize = 18.0 + (16.0 * progress)
+        let verticalSpacing = 2.0 + (6.0 * progress)
         
         return VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                VStack(alignment: .center, spacing: verticalSpacing) {
-                    Text(greeting)
-                        .font(Font.system(size: titleSize, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
-                        .frame(maxWidth: .infinity, alignment: progress > 0.5 ? .center : .leading)
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: verticalSpacing) {
+                    ZStack {
+                        // Expanded Title (Leading)
+                        Text(greeting)
+                            .font(Font.system(size: titleSize, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .opacity(Double(progress > 0.5 ? (progress - 0.5) * 2 : 0))
+                            .offset(x: (1.0 - progress) * 20)
+                        
+                        // Docked Title (Center)
+                        Text("收藏家")
+                            .font(Font.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .opacity(Double(progress < 0.5 ? (0.5 - progress) * 2 : 0))
+                            .offset(x: progress * -20)
+                    }
                     
                     ZStack {
                         // Expanded subtitle
@@ -137,7 +157,8 @@ struct HomeView: View {
                         }
                         .font(Font.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary.opacity(0.8))
-                        .opacity(Double(max(0, (progress - 0.5) * 2)))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .opacity(Double(progress > 0.5 ? (progress - 0.5) * 2 : 0))
                         
                         // Collapsed subtitle (Stats)
                         HStack(spacing: 8) {
@@ -150,10 +171,11 @@ struct HomeView: View {
                         }
                         .font(Font.system(size: 11, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary)
-                        .opacity(Double(max(0, (0.5 - progress) * 2)))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .opacity(Double(progress < 0.5 ? (0.5 - progress) * 2 : 0))
                     }
-                    .frame(maxWidth: .infinity, alignment: progress > 0.5 ? .center : .leading)
                 }
+                .frame(maxWidth: .infinity)
                 
                 if isDocked {
                     Button(action: { 
@@ -181,8 +203,8 @@ struct HomeView: View {
                 }
             }
             .padding(.horizontal, 28)
-            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (15.0 * progress))
-            .padding(.bottom, 12.0 + (8.0 * progress))
+            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (6.0 * progress))
+            .padding(.bottom, 8.0 + (4.0 * progress))
             .background(
                 ZStack {
                     if isDocked {
@@ -206,15 +228,13 @@ struct HomeView: View {
     }
     
     private func handleScroll(_ value: CGFloat) {
-        // Only update if the change is significant enough to reduce re-renders
-        if abs(value - lastScrollUpdate) < scrollUpdateThreshold {
+        if abs(value - scrollOffset) < scrollUpdateThreshold {
             return
         }
         
-        lastScrollUpdate = value
         scrollOffset = value
         
-        let threshold: CGFloat = -100
+        let threshold: CGFloat = -60
         let newCollapsed = value < threshold
         
         if newCollapsed != isCollapsed {
@@ -697,15 +717,6 @@ struct MoreItemsView: View {
             RoundedRectangle(cornerRadius: 22)
                 .fill(Color.black.opacity(0.02))
         )
-    }
-}
-
-// PreferenceKey for tracking scroll offset
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 

@@ -9,32 +9,63 @@ struct PersonalView: View {
     @State private var showingNameAlert = false
     @State private var newName = ""
     @State private var showingCacheAlert = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var initialOffset: CGFloat? = nil
+    @State private var isCollapsed = false
+    @State private var lastScrollUpdate: CGFloat = 0
+    private let scrollUpdateThreshold: CGFloat = 1 // Reduced threshold for smoother tracking
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(red: 0.95, green: 0.95, blue: 0.97)
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        headerSection
-                        
-                        profileSection
-                        
-                        statsSection
-                        
-                        settingsSection
-                        
-                        Divider()
-                            .padding(.horizontal, 40)
-                            .padding(.top, 20)
-                            .opacity(0.3)
-                        
-                        footerSection
-                        
-                        Spacer(minLength: 80)
+            GeometryReader { outerGeo in
+                ZStack(alignment: .top) {
+                    Color(red: 0.95, green: 0.95, blue: 0.97)
+                        .ignoresSafeArea()
+                    
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
+                            // Spacer for the fixed header
+                            Color.clear.frame(height: 90)
+                            
+                            profileSection
+                                .padding(.top, 10)
+                            
+                            statsSection
+                                .padding(.top, 24)
+                            
+                            settingsSection
+                                .padding(.top, 24)
+                            
+                            Divider()
+                                .padding(.horizontal, 40)
+                                .padding(.top, 20)
+                                .opacity(0.3)
+                            
+                            footerSection
+                                .padding(.top, 24)
+                            
+                            Spacer(minLength: 80)
+                        }
+                        .background(
+                            GeometryReader { geo in
+                                let offset = geo.frame(in: .global).minY - outerGeo.frame(in: .global).minY
+                                Color.clear
+                                    .onAppear {
+                                        if initialOffset == nil {
+                                            initialOffset = offset
+                                        }
+                                    }
+                                    .onChange(of: offset) { newValue in
+                                        let calibratedOffset = newValue - (initialOffset ?? newValue)
+                                        handleScroll(calibratedOffset)
+                                    }
+                            }
+                        )
                     }
+                    
+                    // Fixed Header Layer
+                    headerLayer
+                        .zIndex(1)
                 }
             }
             .setTabBarVisibility(true)
@@ -83,17 +114,103 @@ struct PersonalView: View {
         }
     }
     
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("个人中心")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-            
-            Text("管理您的收藏与个人资料")
-                .font(.subheadline)
-                .foregroundColor(.gray)
+    private var headerLayer: some View {
+        let rawProgress = 1.0 + (scrollOffset / 100.0)
+        let progress = min(1.0, max(0.0, rawProgress))
+        let isDocked = scrollOffset < -60
+        
+        // Debug print for UI state
+        // print("🎨 [Header] Progress: \(progress), Offset: \(scrollOffset)")
+        
+        let titleSize = 18.0 + (16.0 * progress)
+        let verticalSpacing = 2.0 + (6.0 * progress)
+        
+        return VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: verticalSpacing) {
+                    ZStack {
+                        // Expanded Title (Leading)
+                        Text("个人中心")
+                            .font(Font.system(size: titleSize, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .opacity(Double(progress > 0.5 ? (progress - 0.5) * 2 : 0))
+                            .offset(x: (1.0 - progress) * 20)
+                        
+                        // Docked Title (Center)
+                        Text("个人中心")
+                            .font(Font.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .opacity(Double(progress < 0.5 ? (0.5 - progress) * 2 : 0))
+                            .offset(x: progress * -20)
+                    }
+                    
+                    ZStack {
+                        // Expanded Subtitle
+                        Text("管理您的收藏与个人资料")
+                            .font(Font.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary.opacity(0.8))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .opacity(Double(progress > 0.5 ? (progress - 0.5) * 2 : 0))
+                        
+                        // Docked Subtitle
+                        Text("个人中心")
+                            .font(Font.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .opacity(Double(progress < 0.5 ? (0.5 - progress) * 2 : 0))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, (UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44) + (6.0 * progress))
+            .padding(.bottom, 8.0 + (2.0 * progress))
+            .background(
+                ZStack {
+                    if isDocked {
+                        BlurView(style: .systemUltraThinMaterialLight)
+                            .ignoresSafeArea()
+                    } else {
+                        Color(red: 0.95, green: 0.95, blue: 0.97)
+                            .ignoresSafeArea()
+                    }
+                }
+            )
+            .overlay(
+                Rectangle()
+                    .fill(Color.black.opacity(0.05))
+                    .frame(height: 0.5)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .opacity(isDocked ? 1 : 0)
+            )
         }
-        .padding(.horizontal)
-        .padding(.top, 20)
+        .ignoresSafeArea(edges: .top)
+        .animation(.easeInOut(duration: 0.2), value: isDocked) // Add animation to the header itself
+    }
+    
+    private func handleScroll(_ value: CGFloat) {
+        // Debug log to verify tracking
+        if abs(value - scrollOffset) > 2 {
+            print("📜 [PersonalView] Scroll Offset: \(value)")
+        }
+        
+        if abs(value - scrollOffset) < scrollUpdateThreshold {
+            return
+        }
+        
+        scrollOffset = value
+        
+        let threshold: CGFloat = -60
+        let newCollapsed = value < threshold
+        
+        if newCollapsed != isCollapsed {
+            isCollapsed = newCollapsed
+            print("🔄 [PersonalView] Header State: \(newCollapsed ? "DOCKED" : "EXPANDED")")
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred(intensity: newCollapsed ? 0.8 : 0.5)
+        }
     }
     
     private var profileSection: some View {
