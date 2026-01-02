@@ -34,7 +34,7 @@ struct MainTabView: View {
             // Content with Custom Switcher (No full-screen swipe)
             GeometryReader { proxy in
                 HStack(spacing: 0) {
-                    HomeView()
+                    HomeView(selectedTab: $selectedTab)
                         .frame(width: proxy.size.width)
                         .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
                             if selectedTab != .home { value = true }

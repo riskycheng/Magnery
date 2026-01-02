@@ -7,6 +7,7 @@ enum HomeMode {
 
 struct HomeView: View {
     @EnvironmentObject var store: MagnetStore
+    @Binding var selectedTab: Tab
     @Namespace private var modeNamespace
     @State private var showingCamera = false
     @State private var ringRotation: Double = 0
@@ -355,30 +356,107 @@ struct HomeView: View {
     
     
     private var contentList: some View {
-        LazyVStack(alignment: .leading, spacing: 40) {
-            ForEach(store.sections) { sectionData in
-                VStack(alignment: .leading, spacing: 24) {
-                    if !sectionData.section.isEmpty {
-                        Text(AttributedString(sectionData.section, attributes: AttributeContainer([
-                            .font: Font.system(size: 12, weight: .bold, design: .monospaced),
-                            .tracking: 3.0
-                        ])))
-                        .foregroundColor(.secondary.opacity(0.5))
-                        .padding(.horizontal, 32)
-                    }
-                    
-                    ForEach(sectionData.groups) { group in
-                        NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
-                            GroupCard(group: group, groupingMode: store.groupingMode)
+        Group {
+            if store.sections.isEmpty {
+                emptyStateView
+            } else {
+                LazyVStack(alignment: .leading, spacing: 40) {
+                    ForEach(store.sections) { sectionData in
+                        VStack(alignment: .leading, spacing: 24) {
+                            if !sectionData.section.isEmpty {
+                                Text(AttributedString(sectionData.section, attributes: AttributeContainer([
+                                    .font: Font.system(size: 12, weight: .bold, design: .monospaced),
+                                    .tracking: 3.0
+                                ])))
+                                .foregroundColor(.secondary.opacity(0.5))
+                                .padding(.horizontal, 32)
+                            }
+                            
+                            ForEach(sectionData.groups) { group in
+                                NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
+                                    GroupCard(group: group, groupingMode: store.groupingMode)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .padding(.horizontal, 24)
+                            }
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        .padding(.horizontal, 24)
                     }
+                }
+                .padding(.top, 20)
+            }
+        }
+        .padding(.bottom, 160)
+    }
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 16) {
+                VStack(spacing: 8) {
+                    Text("开启收藏之旅")
+                        .font(Font.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    Text("捕捉美好瞬间，或在社区寻找灵感。")
+                        .font(Font.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+            }
+            
+            HStack(spacing: 12) {
+                Button(action: {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    showingCamera = true
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "camera.fill")
+                        Text("立即捕捉")
+                    }
+                    .font(Font.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .background(
+                        Capsule()
+                            .fill(Color.orange)
+                            .shadow(color: .orange.opacity(0.2), radius: 8, x: 0, y: 4)
+                    )
+                }
+                
+                Button(action: {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        selectedTab = .community
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "globe.asia.australia.fill")
+                        Text("探索社区")
+                    }
+                    .font(Font.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                    .contentShape(Capsule())
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.05))
+                    )
                 }
             }
         }
-        .padding(.top, 20)
-        .padding(.bottom, 160)
+        .padding(.vertical, 40)
+        .padding(.horizontal, 24)
+        .background(
+            RoundedRectangle(cornerRadius: 32)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.03), radius: 20, x: 0, y: 10)
+        )
+        .padding(.horizontal, 24)
+        .padding(.top, 10)
     }
     
     private var modeAndGroupingToggle: some View {
@@ -632,6 +710,6 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
 }
 
 #Preview {
-    HomeView()
+    HomeView(selectedTab: .constant(.home))
         .environmentObject(MagnetStore())
 }
