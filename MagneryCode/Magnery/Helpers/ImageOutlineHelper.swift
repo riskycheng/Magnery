@@ -4,11 +4,14 @@ import CoreImage
 class ImageOutlineHelper {
     static func addPadding(to image: UIImage, amount: CGFloat) -> UIImage? {
         let newSize = CGSize(width: image.size.width + amount * 2, height: image.size.height + amount * 2)
-        UIGraphicsBeginImageContextWithOptions(newSize, false, image.scale)
-        image.draw(at: CGPoint(x: amount, y: amount))
-        let paddedImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        return paddedImage
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        format.scale = image.scale
+        
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in
+            image.draw(at: CGPoint(x: amount, y: amount))
+        }
     }
 
     static func padToSquare(image: UIImage) -> UIImage? {
@@ -16,16 +19,16 @@ class ImageOutlineHelper {
         let maxDim = max(size.width, size.height)
         let newSize = CGSize(width: maxDim, height: maxDim)
         
-        UIGraphicsBeginImageContextWithOptions(newSize, false, image.scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        format.scale = image.scale
         
-        let originX = (maxDim - size.width) / 2
-        let originY = (maxDim - size.height) / 2
-        image.draw(at: CGPoint(x: originX, y: originY))
-        
-        let paddedImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        
-        return paddedImage
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in
+            let originX = (maxDim - size.width) / 2
+            let originY = (maxDim - size.height) / 2
+            image.draw(at: CGPoint(x: originX, y: originY))
+        }
     }
 
     static func createOutline(from image: UIImage, lineWidth: CGFloat = 3, offset: CGFloat = 0) -> UIImage? {

@@ -2,6 +2,7 @@ import UIKit
 import SwiftUI
 
 enum ShareTemplate: String, CaseIterable {
+    case pure = "纯净"
     case classic = "经典"
     case polaroid = "拍立得"
     case gallery = "画廊"
@@ -16,6 +17,7 @@ enum ShareTemplate: String, CaseIterable {
     
     var backgroundColor: UIColor {
         switch self {
+        case .pure: return .clear
         case .classic: return .white
         case .polaroid: return UIColor(red: 0.99, green: 0.99, blue: 0.98, alpha: 1.0)
         case .gallery: return UIColor(red: 0.94, green: 0.92, blue: 0.90, alpha: 1.0)
@@ -32,6 +34,7 @@ enum ShareTemplate: String, CaseIterable {
     
     var textColor: UIColor {
         switch self {
+        case .pure: return .black
         case .classic: return UIColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
         case .polaroid: return UIColor(red: 0.25, green: 0.25, blue: 0.35, alpha: 1.0)
         case .gallery: return UIColor(red: 0.25, green: 0.2, blue: 0.15, alpha: 1.0)
@@ -47,11 +50,12 @@ enum ShareTemplate: String, CaseIterable {
     }
     
     enum Layout {
-        case vertical, horizontal, polaroid, overlay, blueprint, magazine, zen
+        case pure, vertical, horizontal, polaroid, overlay, blueprint, magazine, zen
     }
     
     var layout: Layout {
         switch self {
+        case .pure: return .pure
         case .classic, .minimal, .traveler, .gallery, .poster, .journal: return .vertical
         case .polaroid: return .polaroid
         case .modern: return .overlay
@@ -69,6 +73,9 @@ class ShareImageHelper {
         
         // Determine Canvas Size based on layout
         switch template.layout {
+        case .pure:
+            let side = max(image.size.width, image.size.height)
+            canvasSize = CGSize(width: side, height: side)
         case .vertical:
             canvasSize = CGSize(width: image.size.width + padding * 2, height: image.size.height + padding * 3 + 200)
         case .horizontal:
@@ -82,6 +89,7 @@ class ShareImageHelper {
         
         let format = UIGraphicsImageRendererFormat()
         format.scale = 2.0 // Force 2x scale instead of 3x to save memory while keeping quality
+        format.opaque = false
         let mainRenderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
         
         return mainRenderer.image { rendererContext in
@@ -91,13 +99,15 @@ class ShareImageHelper {
             let rect = CGRect(origin: .zero, size: canvasSize)
             if template == .modern {
                 drawGradientBackground(in: rect, context: context)
-            } else {
+            } else if template != .pure {
                 template.backgroundColor.setFill()
                 context.fill(rect)
             }
             
             // 2. Draw Image and Text based on layout
             switch template.layout {
+            case .pure:
+                drawPureLayout(image: image, canvasSize: canvasSize, context: context)
             case .vertical:
                 drawVerticalLayout(image: image, item: item, template: template, canvasSize: canvasSize, padding: padding, context: context)
             case .horizontal:
@@ -124,6 +134,27 @@ class ShareImageHelper {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let gradient = CGGradient(colorsSpace: colorSpace, colors: colors as CFArray, locations: [0.0, 1.0])!
         context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: rect.width, y: rect.height), options: [])
+    }
+    
+    private static func drawPureLayout(image: UIImage, canvasSize: CGSize, context: CGContext) {
+        let side = canvasSize.width
+        let imageAspect = image.size.width / image.size.height
+        
+        let drawRect: CGRect
+        if imageAspect > 1 {
+            // Wider than tall - Aspect Fit
+            let h = side / imageAspect
+            drawRect = CGRect(x: 0, y: (side - h) / 2, width: side, height: h)
+        } else {
+            // Taller than wide - Aspect Fit
+            let w = side * imageAspect
+            drawRect = CGRect(x: (side - w) / 2, y: 0, width: w, height: side)
+        }
+        
+        context.saveGState()
+        // Draw the image directly without clipping to allow transparency to be preserved
+        image.draw(in: drawRect)
+        context.restoreGState()
     }
     
     private static func drawVerticalLayout(image: UIImage, item: MagnetItem, template: ShareTemplate, canvasSize: CGSize, padding: CGFloat, context: CGContext) {
@@ -283,12 +314,25 @@ class ShareImageHelper {
     private static func drawBlueprintLayout(image: UIImage, item: MagnetItem, template: ShareTemplate, canvasSize: CGSize, context: CGContext) {
         // Draw Image with white outline
         let padding: CGFloat = 100
-        let imageRect = CGRect(x: padding, y: padding, width: canvasSize.width - padding * 2, height: canvasSize.height - padding * 3.5)
+        let targetRect = CGRect(x: padding, y: padding, width: canvasSize.width - padding * 2, height: canvasSize.height - padding * 3.5)
+        
+        // Calculate aspect fit rect to avoid deformation
+        let imageAspect = image.size.width / image.size.height
+        let targetAspect = targetRect.width / targetRect.height
+        
+        let imageRect: CGRect
+        if imageAspect > targetAspect {
+            let h = targetRect.width / imageAspect
+            imageRect = CGRect(x: targetRect.minX, y: targetRect.minY + (targetRect.height - h) / 2, width: targetRect.width, height: h)
+        } else {
+            let w = targetRect.height * imageAspect
+            imageRect = CGRect(x: targetRect.minX + (targetRect.width - w) / 2, y: targetRect.minY, width: w, height: targetRect.height)
+        }
         
         context.saveGState()
         context.setStrokeColor(UIColor.white.withAlphaComponent(0.5).cgColor)
         context.setLineWidth(2)
-        context.stroke(imageRect)
+        context.stroke(targetRect) // Stroke the target area boundary
         
         // Draw grid lines (cleaner, wider grid)
         let step: CGFloat = 150
@@ -316,11 +360,11 @@ class ShareImageHelper {
         
         // Draw Name
         let name = item.name.uppercased()
-        name.draw(at: CGPoint(x: padding, y: imageRect.maxY + 60), withAttributes: titleAttrs)
+        name.draw(at: CGPoint(x: padding, y: targetRect.maxY + 60), withAttributes: titleAttrs)
         
         // Draw Location and Date (Simplified)
         let info = "\(item.location.uppercased()) // \(formatDate(item.date))"
-        info.draw(at: CGPoint(x: padding, y: imageRect.maxY + 120), withAttributes: detailAttrs)
+        info.draw(at: CGPoint(x: padding, y: targetRect.maxY + 120), withAttributes: detailAttrs)
         
         drawWatermark(canvasSize: canvasSize, padding: padding, color: .white)
     }
@@ -370,8 +414,22 @@ class ShareImageHelper {
         let imageSide = canvasSize.width - padding * 2
         let imageRect = CGRect(x: padding, y: padding, width: imageSide, height: imageSide)
         
-        // Image with slight inner shadow
-        image.draw(in: imageRect)
+        // Calculate aspect fill rect for the square polaroid area
+        let imageAspect = image.size.width / image.size.height
+        let drawRect: CGRect
+        if imageAspect > 1 {
+            let w = imageSide * imageAspect
+            drawRect = CGRect(x: padding - (w - imageSide) / 2, y: padding, width: w, height: imageSide)
+        } else {
+            let h = imageSide / imageAspect
+            drawRect = CGRect(x: padding, y: padding - (h - imageSide) / 2, width: imageSide, height: h)
+        }
+        
+        context.saveGState()
+        context.addRect(imageRect)
+        context.clip()
+        image.draw(in: drawRect)
+        context.restoreGState()
         
         // Handwritten text
         let font = UIFont(name: "ChalkboardSE-Regular", size: 40) ?? UIFont.systemFont(ofSize: 40)
@@ -455,7 +513,20 @@ class ShareImageHelper {
     
     private static func drawZenLayout(image: UIImage, item: MagnetItem, template: ShareTemplate, canvasSize: CGSize, context: CGContext) {
         let padding: CGFloat = 120
-        let imageRect = CGRect(x: padding, y: padding, width: canvasSize.width - padding * 3.5, height: canvasSize.height - padding * 2)
+        let targetRect = CGRect(x: padding, y: padding, width: canvasSize.width - padding * 3.5, height: canvasSize.height - padding * 2)
+        
+        // Calculate aspect fit rect to avoid deformation
+        let imageAspect = image.size.width / image.size.height
+        let targetAspect = targetRect.width / targetRect.height
+        
+        let imageRect: CGRect
+        if imageAspect > targetAspect {
+            let h = targetRect.width / imageAspect
+            imageRect = CGRect(x: targetRect.minX, y: targetRect.minY + (targetRect.height - h) / 2, width: targetRect.width, height: h)
+        } else {
+            let w = targetRect.height * imageAspect
+            imageRect = CGRect(x: targetRect.minX + (targetRect.width - w) / 2, y: targetRect.minY, width: w, height: targetRect.height)
+        }
         
         // Draw Image with subtle border
         context.saveGState()

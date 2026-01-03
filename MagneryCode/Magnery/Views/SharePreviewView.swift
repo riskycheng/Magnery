@@ -3,7 +3,7 @@ import SwiftUI
 struct SharePreviewView: View {
     @Environment(\.dismiss) var dismiss
     let item: MagnetItem
-    @State private var selectedTemplate: ShareTemplate = .classic
+    @State private var selectedTemplate: ShareTemplate = .pure
     @State private var processedImages: [ShareTemplate: UIImage] = [:]
     @State private var isSaving = false
     @State private var showSuccessAlert = false
@@ -148,7 +148,9 @@ struct SharePreviewView: View {
         let scale = min(maxDimension / originalImage.size.width, maxDimension / originalImage.size.height, 1.0)
         let targetSize = CGSize(width: originalImage.size.width * scale, height: originalImage.size.height * scale)
         
-        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
         let downscaledImage = renderer.image { _ in
             originalImage.draw(in: CGRect(origin: .zero, size: targetSize))
         }

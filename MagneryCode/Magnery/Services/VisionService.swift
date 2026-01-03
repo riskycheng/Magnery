@@ -113,6 +113,7 @@ class VisionService {
     private func normalizeImage(_ image: UIImage, targetSize: CGSize) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
+        format.opaque = false
         let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
         
         return renderer.image { context in
