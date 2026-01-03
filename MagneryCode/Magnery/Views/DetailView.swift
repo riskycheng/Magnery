@@ -50,24 +50,32 @@ struct DetailView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                if !groupItems.isEmpty {
-                    horizontalItemsList
-                        .padding(.top, 8)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(groupTitle)
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    if !groupItems.isEmpty {
+                        itemsScrollView
+                    }
                 }
+                .padding(.top, 8)
                 
                 Spacer()
                 
                 if let modelPath = currentMagnet.modelPath {
                     Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
+                        .id(modelPath)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 500)
+                        .frame(height: 380)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
                             removal: .scale(scale: 0.8).combined(with: .opacity)
                         ))
                 } else if let gifPath = currentMagnet.gifPath {
                     NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
-                        .frame(maxHeight: 350)
+                        .id(gifPath)
+                        .frame(maxHeight: 380)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
                             removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -90,7 +98,8 @@ struct DetailView: View {
                                 .aspectRatio(contentMode: .fit)
                         }
                     }
-                    .frame(maxHeight: 350)
+                    .id(currentMagnet.imagePath)
+                    .frame(maxHeight: 380)
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.8).combined(with: .opacity),
                         removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -249,62 +258,56 @@ struct DetailView: View {
         }
     }
     
-    private var horizontalItemsList: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(groupTitle)
-                .font(.headline)
-                .padding(.horizontal)
-            
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(groupItems) { item in
-                            Button(action: {
-                                withAnimation {
-                                    currentMagnet = item
-                                }
-                            }) {
-                                Group {
-                                    if item.imagePath.hasPrefix("http") {
-                                        AsyncImage(url: URL(string: item.imagePath)) { phase in
-                                            if case .success(let image) = phase {
-                                                image.resizable()
-                                                    .aspectRatio(contentMode: .fit)
-                                            } else {
-                                                Color.gray.opacity(0.1)
-                                            }
-                                        }
-                                    } else if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
-                                        Image(uiImage: image)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                    }
-                                }
-                                .frame(width: 60, height: 60)
-                                .opacity(item.id == currentMagnet.id ? 1.0 : 0.5)
-                                .scaleEffect(item.id == currentMagnet.id ? 1.3 : 0.9)
-                                .shadow(
-                                    color: item.id == currentMagnet.id ? .blue.opacity(0.3) : .clear,
-                                    radius: item.id == currentMagnet.id ? 8 : 0,
-                                    x: 0,
-                                    y: 2
-                                )
+    private var itemsScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(groupItems) { item in
+                        Button(action: {
+                            withAnimation {
+                                currentMagnet = item
                             }
-                            .id(item.id)
+                        }) {
+                            Group {
+                                if item.imagePath.hasPrefix("http") {
+                                    AsyncImage(url: URL(string: item.imagePath)) { phase in
+                                        if case .success(let image) = phase {
+                                            image.resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                        } else {
+                                            Color.gray.opacity(0.1)
+                                        }
+                                    }
+                                } else if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
+                                    Image(uiImage: image)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                }
+                            }
+                            .frame(width: 60, height: 60)
+                            .opacity(item.id == currentMagnet.id ? 1.0 : 0.5)
+                            .scaleEffect(item.id == currentMagnet.id ? 1.3 : 0.9)
+                            .shadow(
+                                color: item.id == currentMagnet.id ? .blue.opacity(0.3) : .clear,
+                                radius: item.id == currentMagnet.id ? 8 : 0,
+                                x: 0,
+                                y: 2
+                            )
                         }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
-                }
-                .frame(height: 100)
-                .onChange(of: currentMagnet.id) { oldValue, newValue in
-                    withAnimation {
-                        proxy.scrollTo(newValue, anchor: .center)
+                        .id(item.id)
                     }
                 }
-                .onAppear {
-                    proxy.scrollTo(currentMagnet.id, anchor: .center)
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+            }
+            .frame(height: 100)
+            .onChange(of: currentMagnet.id) { oldValue, newValue in
+                withAnimation {
+                    proxy.scrollTo(newValue, anchor: .center)
                 }
+            }
+            .onAppear {
+                proxy.scrollTo(currentMagnet.id, anchor: .center)
             }
         }
     }

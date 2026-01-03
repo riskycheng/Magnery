@@ -89,6 +89,9 @@ struct Model3DView: View {
         .onAppear {
             loadModel()
         }
+        .onChange(of: url) { oldValue, newValue in
+            loadModel()
+        }
     }
 
     private func loadModel() {
@@ -241,7 +244,8 @@ struct Model3DView: View {
         newCameraNode.camera = camera
         
         // Since we centered the model at (0,0,0), the camera just needs to look at the origin
-        newCameraNode.position = SCNVector3(x: 0, y: 0, z: radius * 1.3)
+        // Reduced multiplier from 1.3 to 1.05 to make the model appear larger in the frame
+        newCameraNode.position = SCNVector3(x: 0, y: 0, z: radius * 1.05)
         scnScene.rootNode.addChildNode(newCameraNode)
         
         // 7. Add basic lighting
