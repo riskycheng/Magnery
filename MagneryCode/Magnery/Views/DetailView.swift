@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 struct EllipsisButtonBoundsKey: PreferenceKey {
     static var defaultValue: CGRect?
@@ -383,7 +384,20 @@ struct DetailView: View {
     
     private func saveAsWallpaper() {
         guard let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) else { return }
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        
+        // Save as PNG to preserve transparency if it's a sticker
+        PHPhotoLibrary.shared().performChanges({
+            let request = PHAssetCreationRequest.forAsset()
+            if let data = image.pngData() {
+                request.addResource(with: .photo, data: data, options: nil)
+            }
+        }) { success, error in
+            if success {
+                // Success
+            } else {
+                print("Error saving image: \(String(describing: error))")
+            }
+        }
     }
     
     private func handleSwipeGesture(translation: CGSize) {

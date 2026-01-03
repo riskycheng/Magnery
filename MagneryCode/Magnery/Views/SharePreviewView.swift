@@ -1,4 +1,5 @@
 import SwiftUI
+import Photos
 
 struct SharePreviewView: View {
     @Environment(\.dismiss) var dismiss
@@ -172,11 +173,28 @@ struct SharePreviewView: View {
         guard let image = processedImages[selectedTemplate] else { return }
         isSaving = true
         
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            isSaving = false
-            showSuccessAlert = true
+        if selectedTemplate == .pure {
+            // For pure template, save as PNG to preserve transparency
+            PHPhotoLibrary.shared().performChanges({
+                let request = PHAssetCreationRequest.forAsset()
+                if let data = image.pngData() {
+                    request.addResource(with: .photo, data: data, options: nil)
+                }
+            }) { success, error in
+                DispatchQueue.main.async {
+                    isSaving = false
+                    if success {
+                        showSuccessAlert = true
+                    }
+                }
+            }
+        } else {
+            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isSaving = false
+                showSuccessAlert = true
+            }
         }
     }
 }
