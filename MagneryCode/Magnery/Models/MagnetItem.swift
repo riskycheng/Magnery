@@ -73,6 +73,16 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
         URL(string: imagePath)
     }
     
+    var gifURL: URL? {
+        guard let path = gifPath else { return nil }
+        return URL(string: path)
+    }
+    
+    var modelURL: URL? {
+        guard let path = modelPath else { return nil }
+        return URL(string: path)
+    }
+    
     init(id: UUID = UUID(), name: String, date: Date = Date(), location: String = "未知位置", latitude: Double? = nil, longitude: Double? = nil, imagePath: String, gifPath: String? = nil, modelPath: String? = nil, notes: String = "") {
         self.id = id
         self.name = name

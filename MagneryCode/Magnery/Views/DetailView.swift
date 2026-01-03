@@ -28,6 +28,16 @@ struct DetailView: View {
     @State private var refreshTrigger: Bool = false
     @State private var showingDeleteConfirmation = false
     @State private var itemToShare: MagnetItem? = nil
+    @State private var isCollecting = false
+    @StateObject private var downloadManager = DownloadManager()
+    
+    private var isCommunityMagnet: Bool {
+        currentMagnet.imagePath.hasPrefix("http")
+    }
+    
+    private var isAlreadyCollected: Bool {
+        store.magnets.contains(where: { $0.name == currentMagnet.name && $0.location == currentMagnet.location })
+    }
     
     init(magnet: MagnetItem) {
         self.magnet = magnet
@@ -158,6 +168,29 @@ struct DetailView: View {
                         y: ellipsisButtonFrame.maxY
                     )
                     .zIndex(999)
+            }
+            
+            if isCollecting {
+                ZStack {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 15) {
+                        ProgressView(value: downloadManager.progress)
+                            .progressViewStyle(.linear)
+                            .frame(width: 150)
+                            .tint(.white)
+                        
+                        Text("正在收藏到本地...")
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+                    .padding(30)
+                    .background(BlurView(style: .systemMaterialDark))
+                    .cornerRadius(20)
+                }
+                .transition(.opacity)
+                .zIndex(1000)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -290,23 +323,35 @@ struct DetailView: View {
             }
             .transition(.scale.combined(with: .opacity))
             
-            // Edit Button
-            Button(action: {
-                showingEditMenu = false
-                showingEditSheet = true
-            }) {
-                menuButtonOverlay(icon: "pencil.circle.fill", color: .orange, size: buttonSize)
+            if isCommunityMagnet {
+                if !isAlreadyCollected {
+                    // Collect Button
+                    Button(action: {
+                        collectMagnet()
+                    }) {
+                        menuButtonOverlay(icon: "plus.circle.fill", color: .green, size: buttonSize)
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+            } else {
+                // Edit Button
+                Button(action: {
+                    showingEditMenu = false
+                    showingEditSheet = true
+                }) {
+                    menuButtonOverlay(icon: "pencil.circle.fill", color: .orange, size: buttonSize)
+                }
+                .transition(.scale.combined(with: .opacity))
+                
+                // Delete Button
+                Button(action: {
+                    showingEditMenu = false
+                    showingDeleteConfirmation = true
+                }) {
+                    menuButtonOverlay(icon: "trash.circle.fill", color: .red, size: buttonSize)
+                }
+                .transition(.scale.combined(with: .opacity))
             }
-            .transition(.scale.combined(with: .opacity))
-            
-            // Delete Button
-            Button(action: {
-                showingEditMenu = false
-                showingDeleteConfirmation = true
-            }) {
-                menuButtonOverlay(icon: "trash.circle.fill", color: .red, size: buttonSize)
-            }
-            .transition(.scale.combined(with: .opacity))
         }
         .padding(10)
         .background(
@@ -376,6 +421,82 @@ struct DetailView: View {
                     currentMagnet = groupItems[currentIndex + 1]
                     refreshTrigger.toggle()
                 }
+            }
+        }
+    }
+    
+    private func collectMagnet() {
+        isCollecting = true
+        showingEditMenu = false
+        
+        Task {
+            var localMagnet = currentMagnet
+            // Use a new UUID for the local copy to avoid conflicts
+            let newId = UUID()
+            
+            // 1. Download and save image
+            if let imageURL = currentMagnet.imageURL, currentMagnet.imagePath.hasPrefix("http") {
+                do {
+                    let tempURL = try await downloadManager.download(url: imageURL, to: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+                    if let data = try? Data(contentsOf: tempURL), let image = UIImage(data: data) {
+                        if let savedName = ImageManager.shared.saveImage(image) {
+                            localMagnet.imagePath = savedName
+                        }
+                    }
+                } catch {
+                    print("❌ [DetailView] Failed to download image: \(error.localizedDescription)")
+                }
+            }
+            
+            // 2. Download and save GIF if exists
+            if let gifURL = currentMagnet.gifURL, currentMagnet.gifPath?.hasPrefix("http") == true {
+                do {
+                    let tempURL = try await downloadManager.download(url: gifURL, to: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+                    if let savedName = ImageManager.shared.saveFile(from: tempURL, extension: "gif") {
+                        localMagnet.gifPath = savedName
+                    }
+                } catch {
+                    print("❌ [DetailView] Failed to download GIF: \(error.localizedDescription)")
+                }
+            }
+            
+            // 3. Download and save 3D model if exists
+            if let modelURL = currentMagnet.modelURL, currentMagnet.modelPath?.hasPrefix("http") == true {
+                do {
+                    let tempURL = try await downloadManager.download(url: modelURL, to: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+                    if let savedName = ImageManager.shared.saveFile(from: tempURL, extension: "usdz") {
+                        localMagnet.modelPath = savedName
+                    }
+                } catch {
+                    print("❌ [DetailView] Failed to download model: \(error.localizedDescription)")
+                }
+            }
+            
+            await MainActor.run {
+                // Create the final local magnet with the new ID
+                let finalMagnet = MagnetItem(
+                    id: newId,
+                    name: localMagnet.name,
+                    date: Date(), // Use current date for collection
+                    location: localMagnet.location,
+                    latitude: localMagnet.latitude,
+                    longitude: localMagnet.longitude,
+                    imagePath: localMagnet.imagePath,
+                    gifPath: localMagnet.gifPath,
+                    modelPath: localMagnet.modelPath,
+                    notes: localMagnet.notes
+                )
+                
+                store.addMagnet(finalMagnet)
+                isCollecting = false
+                
+                // Update current view to the local one
+                withAnimation {
+                    currentMagnet = finalMagnet
+                }
+                
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
             }
         }
     }

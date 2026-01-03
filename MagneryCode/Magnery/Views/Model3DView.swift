@@ -248,16 +248,36 @@ struct Model3DView: View {
         let ambientLightNode = SCNNode()
         ambientLightNode.light = SCNLight()
         ambientLightNode.light?.type = .ambient
-        ambientLightNode.light?.color = UIColor(white: 0.7, alpha: 1.0)
+        ambientLightNode.light?.color = UIColor(white: 0.6, alpha: 1.0)
         scnScene.rootNode.addChildNode(ambientLightNode)
         
+        // Main directional light (Sun-like)
         let directionalLightNode = SCNNode()
         directionalLightNode.light = SCNLight()
         directionalLightNode.light?.type = .directional
         directionalLightNode.light?.intensity = 1000
-        directionalLightNode.position = SCNVector3(x: radius, y: radius, z: radius)
+        directionalLightNode.light?.castsShadow = true
+        directionalLightNode.position = SCNVector3(x: radius * 2, y: radius * 2, z: radius * 2)
         directionalLightNode.look(at: SCNVector3(0, 0, 0))
         scnScene.rootNode.addChildNode(directionalLightNode)
+        
+        // Fill light (Opposite side)
+        let fillLightNode = SCNNode()
+        fillLightNode.light = SCNLight()
+        fillLightNode.light?.type = .directional
+        fillLightNode.light?.intensity = 400
+        fillLightNode.position = SCNVector3(x: -radius, y: radius, z: -radius)
+        fillLightNode.look(at: SCNVector3(0, 0, 0))
+        scnScene.rootNode.addChildNode(fillLightNode)
+        
+        // Top light
+        let topLightNode = SCNNode()
+        topLightNode.light = SCNLight()
+        topLightNode.light?.type = .directional
+        topLightNode.light?.intensity = 300
+        topLightNode.position = SCNVector3(x: 0, y: radius * 2, z: 0)
+        topLightNode.look(at: SCNVector3(0, 0, 0))
+        scnScene.rootNode.addChildNode(topLightNode)
         
         DispatchQueue.main.async {
             self.cameraNode = newCameraNode

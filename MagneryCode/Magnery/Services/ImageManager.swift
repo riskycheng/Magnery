@@ -38,6 +38,22 @@ class ImageManager {
         }
     }
     
+    func saveFile(from url: URL, extension ext: String) -> String? {
+        let filename = UUID().uuidString + "." + ext
+        let destinationURL = getDocumentsDirectory().appendingPathComponent(filename)
+        
+        do {
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            try FileManager.default.copyItem(at: url, to: destinationURL)
+            return filename
+        } catch {
+            print("Error saving file: \(error)")
+            return nil
+        }
+    }
+    
     func loadImage(filename: String) -> UIImage? {
         if let cached = cache.object(forKey: filename as NSString) {
             return cached
