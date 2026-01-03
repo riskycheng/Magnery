@@ -7,13 +7,6 @@ struct EllipsisButtonBoundsKey: PreferenceKey {
     }
 }
 
-struct ViewSizeKey: PreferenceKey {
-    static var defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        value = nextValue()
-    }
-}
-
 struct DetailView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var store: MagnetStore
@@ -24,7 +17,6 @@ struct DetailView: View {
     @State private var currentMagnet: MagnetItem
     @State private var groupItems: [MagnetItem] = []
     @State private var ellipsisButtonFrame: CGRect = .zero
-    @State private var menuSize: CGSize = CGSize(width: 60, height: 60)
     @State private var refreshTrigger: Bool = false
     @State private var showingDeleteConfirmation = false
     @State private var itemToShare: MagnetItem? = nil
@@ -45,21 +37,22 @@ struct DetailView: View {
     }
     
     var body: some View {
-        ZStack {
-            Color(red: 0.95, green: 0.95, blue: 0.97)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(groupTitle)
-                        .font(.headline)
-                        .padding(.horizontal)
-                    
-                    if !groupItems.isEmpty {
-                        itemsScrollView
+        GeometryReader { mainGeo in
+            ZStack {
+                Color(red: 0.95, green: 0.95, blue: 0.97)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(groupTitle)
+                            .font(.headline)
+                            .padding(.horizontal)
+                        
+                        if !groupItems.isEmpty {
+                            itemsScrollView
+                        }
                     }
-                }
-                .padding(.top, 8)
+                    .padding(.top, 8)
                 
                 Spacer()
                 
@@ -161,20 +154,11 @@ struct DetailView: View {
             
             if showingEditMenu && ellipsisButtonFrame != .zero {
                 circularMenuButtons
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear
-                                .preference(key: ViewSizeKey.self, value: proxy.size)
-                        }
-                    )
-                    .onPreferenceChange(ViewSizeKey.self) { size in
-                        if size != .zero {
-                            menuSize = size
-                        }
-                    }
+                    .fixedSize()
+                    .frame(width: 0, height: 0, alignment: .top)
                     .position(
-                        x: ellipsisButtonFrame.midX,
-                        y: ellipsisButtonFrame.maxY
+                        x: ellipsisButtonFrame.midX - mainGeo.frame(in: .global).minX,
+                        y: ellipsisButtonFrame.maxY - mainGeo.frame(in: .global).minY + 20
                     )
                     .zIndex(999)
             }
@@ -202,6 +186,7 @@ struct DetailView: View {
                 .zIndex(1000)
             }
         }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -218,7 +203,7 @@ struct DetailView: View {
                                 Color.clear
                                     .preference(
                                         key: EllipsisButtonBoundsKey.self,
-                                        value: geo.frame(in: .named("detail_root")).midX > 0 ? geo.frame(in: .named("detail_root")) : nil
+                                        value: geo.frame(in: .global).midX > 0 ? geo.frame(in: .global) : nil
                                     )
                             }
                         )
@@ -230,7 +215,6 @@ struct DetailView: View {
                 ellipsisButtonFrame = frame
             }
         }
-        .coordinateSpace(name: "detail_root")
         .setTabBarVisibility(false)
         .toolbar(.hidden, for: .tabBar)
         .onAppear {
