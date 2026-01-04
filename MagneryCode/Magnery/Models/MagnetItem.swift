@@ -13,6 +13,7 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
     var modelPath: String?
     var notes: String
     var isFavorite: Bool? = false
+    var cachedIntroduction: String?
     
     var favoriteStatus: Bool {
         isFavorite ?? false

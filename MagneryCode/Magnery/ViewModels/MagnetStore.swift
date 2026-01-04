@@ -81,6 +81,7 @@ class MagnetStore: ObservableObject {
     
     func updateMagnet(_ magnet: MagnetItem) {
         if let index = magnets.firstIndex(where: { $0.id == magnet.id }) {
+            print("💾 [MagnetStore] Updating magnet: \(magnet.name). Cache length: \(magnet.cachedIntroduction?.count ?? 0)")
             magnets[index] = magnet
             saveMagnets()
             updateSections()

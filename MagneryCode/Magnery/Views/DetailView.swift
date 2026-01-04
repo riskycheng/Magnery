@@ -225,7 +225,13 @@ struct DetailView: View {
             SharePreviewView(item: item)
         }
         .sheet(isPresented: $showingAIDialog) {
-            AIDialogView(magnet: currentMagnet)
+            AIDialogView(magnet: $currentMagnet)
+        }
+        .onChange(of: showingAIDialog) { oldValue, newValue in
+            if !newValue {
+                // Refresh group items when AI dialog is closed to ensure cache is synced
+                loadGroupItems()
+            }
         }
         .sheet(isPresented: $showingEditSheet) {
             EditMagnetSheet(magnet: $currentMagnet, onSave: {
@@ -543,88 +549,433 @@ struct DetailView: View {
 
 struct AIDialogView: View {
     @Environment(\.dismiss) var dismiss
-    let magnet: MagnetItem
-    @State private var aiResponse: String = ""
-    @State private var isListening = false
+    @EnvironmentObject var store: MagnetStore
+    @Binding var magnet: MagnetItem
+    
+    @StateObject private var speechService = SpeechService.shared
+    @State private var messages: [AIService.Message] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var userInput: String = ""
+    @State private var isShowingChat = false
     
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    dismiss()
-                }
-            
-            VStack {
-                Spacer()
-                
-                VStack(spacing: 20) {
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            dismiss()
-                        }) {
-                            Image(systemName: "xmark")
-                                .foregroundColor(.gray)
-                                .padding()
-                        }
+        let _ = print("🎨 [AIDialogView] Rendering body. Messages: \(messages.count), Loading: \(isLoading)")
+        NavigationView {
+            VStack(spacing: 0) {
+                if isLoading && messages.isEmpty {
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("AI 正在思考中...")
+                            .padding(.top)
+                            .foregroundColor(.secondary)
                     }
-                    
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text(generateAIResponse())
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .padding()
-                        }
-                    }
-                    .frame(maxHeight: 300)
-                    
-                    VStack(spacing: 12) {
-                        Button(action: {
-                            isListening.toggle()
-                        }) {
-                            HStack {
-                                Image(systemName: "mic.fill")
-                                Text("语音提问")
-                                    .fontWeight(.semibold)
-                            }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let error = errorMessage {
+                    VStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
                             .padding()
-                            .background(Color.blue.opacity(0.6))
-                            .clipShape(Capsule())
+                        Button("重试") {
+                            loadIntroduction()
                         }
-                        
-                        Button(action: {
-                            dismiss()
-                        }) {
-                            Text("知道了")
+                        .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 32) {
+                                // Introduction Section (Plain Text)
+                                if !messages.isEmpty {
+                                    let firstMsg = messages[0]
+                                    if case .text(let content) = firstMsg.content {
+                                        VStack(alignment: .leading, spacing: 28) {
+                                            let paragraphs = content.components(separatedBy: "\n")
+                                            ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
+                                                let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
+                                                if !trimmed.isEmpty {
+                                                    // Add double ideographic space for indentation
+                                                    Text("\u{3000}\u{3000}\(trimmed)")
+                                                        .font(.system(size: 20, weight: .regular, design: .serif))
+                                                        .lineSpacing(16)
+                                                        .foregroundColor(.primary.opacity(0.9))
+                                                        .multilineTextAlignment(.leading)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                }
+                                            }
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.top, 24)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                } else if !isLoading {
+                                    // Debug view if messages is empty but not loading
+                                    VStack {
+                                        Text("暂无科普内容")
+                                            .foregroundColor(.secondary)
+                                        Button("重新生成") {
+                                            loadIntroduction(forceRefresh: true)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 200)
+                                }
+                                
+                                // Chat Section (Bubbles)
+                                if messages.count > 1 {
+                                    VStack(spacing: 20) {
+                                        ForEach(1..<messages.count, id: \.self) { index in
+                                            let message = messages[index]
+                                            MessageBubble(message: message)
+                                                .id(index)
+                                        }
+                                    }
+                                    .padding(.horizontal, 12)
+                                }
+                                
+                                if isLoading && !messages.isEmpty {
+                                    HStack {
+                                        ProgressView()
+                                            .padding(.trailing, 8)
+                                        Text("AI 正在输入...")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .id("loading")
+                                }
+                                
+                                Spacer(minLength: 50)
+                            }
+                            .padding(.bottom, 30)
+                        }
+                        .onChange(of: messages.count) { _ in
+                            if !messages.isEmpty {
+                                withAnimation {
+                                    proxy.scrollTo(messages.count - 1, anchor: .bottom)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Divider()
+                
+                VStack(spacing: 12) {
+                    if !isShowingChat {
+                        HStack(spacing: 16) {
+                            Button(action: {
+                                if speechService.isListening {
+                                    speechService.stopListening()
+                                } else {
+                                    speechService.stopSpeaking()
+                                    speechService.startListening { text in
+                                        if let text = text, !text.isEmpty {
+                                            userInput = text
+                                            withAnimation {
+                                                isShowingChat = true
+                                            }
+                                            sendMessage()
+                                        }
+                                    }
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: speechService.isListening ? "stop.fill" : "mic.fill")
+                                    Text(speechService.isListening ? "正在倾听..." : "语音提问")
+                                }
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(speechService.isListening ? Color.red : Color.blue)
+                                .clipShape(Capsule())
+                            }
+                            
+                            Button(action: {
+                                speechService.stopSpeaking()
+                                loadIntroduction(forceRefresh: true)
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("重新生成")
+                                }
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(Color.orange)
                                 .clipShape(Capsule())
+                            }
                         }
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
+                    } else {
+                        HStack {
+                            TextField(speechService.isListening ? "正在倾听..." : "问问 AI 更多细节...", text: $userInput)
+                                .padding(10)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(20)
+                            
+                            if userInput.isEmpty {
+                                Button(action: {
+                                    if speechService.isListening {
+                                        speechService.stopListening()
+                                    } else {
+                                        speechService.stopSpeaking()
+                                        speechService.startListening { text in
+                                            if let text = text, !text.isEmpty {
+                                                userInput = text
+                                                sendMessage()
+                                            }
+                                        }
+                                    }
+                                }) {
+                                    Image(systemName: speechService.isListening ? "stop.fill" : "mic.fill")
+                                        .foregroundColor(.white)
+                                        .padding(10)
+                                        .background(speechService.isListening ? Color.red : Color.blue)
+                                        .clipShape(Circle())
+                                }
+                            } else {
+                                Button(action: {
+                                    speechService.stopSpeaking()
+                                    sendMessage()
+                                }) {
+                                    Image(systemName: "paperplane.fill")
+                                        .foregroundColor(.white)
+                                        .padding(10)
+                                        .background(Color.blue)
+                                        .clipShape(Circle())
+                                }
+                                .disabled(isLoading)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
                     }
-                    .padding(.horizontal)
                 }
-                .padding()
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .padding()
+                .background(Color(uiColor: .systemBackground))
+            }
+            .navigationTitle("AI 科普")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("关闭") {
+                        speechService.stopSpeaking()
+                        speechService.stopListening()
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            print("👋 [AIDialogView] onAppear. Cache status: \(magnet.cachedIntroduction != nil ? "Present (\(magnet.cachedIntroduction!.count) chars)" : "Empty")")
+            loadIntroduction()
+        }
+        .onDisappear {
+            speechService.stopSpeaking()
+            speechService.stopListening()
+        }
+    }
+    
+    private func loadIntroduction(forceRefresh: Bool = false) {
+        if !forceRefresh, let cached = magnet.cachedIntroduction, !cached.isEmpty {
+            print("📦 [AIDialogView] Loading from cache. Length: \(cached.count)")
+            isLoading = false
+            messages = [.init(role: "assistant", content: .text(cached))]
+            return
+        }
+        
+        print("🔍 [AIDialogView] No cache found or force refresh. Starting generation...")
+        isLoading = true
+        errorMessage = nil
+        messages = []
+        
+        Task {
+            do {
+                print("📖 [AIDialogView] Starting introduction generation for: \(magnet.name)")
+                let image = ImageManager.shared.loadImage(filename: magnet.imagePath ?? "")
+                let stream = AIService.shared.generateIntroductionStream(
+                    itemName: magnet.name,
+                    location: magnet.location,
+                    date: magnet.date,
+                    image: image,
+                    modelType: .powerful
+                )
+                
+                var fullText = ""
+                var hasStarted = false
+                var lastUpdate = Date()
+                
+                for try await text in stream {
+                    if !hasStarted {
+                        await MainActor.run {
+                            isLoading = false
+                            messages = [.init(role: "assistant", content: .text(""))]
+                        }
+                        hasStarted = true
+                    }
+                    
+                    fullText += text
+                    
+                    // Throttle UI updates to 10Hz for better performance and smoothness
+                    if Date().timeIntervalSince(lastUpdate) > 0.1 {
+                        let currentText = fullText
+                        await MainActor.run {
+                            if !messages.isEmpty {
+                                messages[0] = .init(role: "assistant", content: .text(currentText))
+                            }
+                        }
+                        lastUpdate = Date()
+                    }
+                }
+                
+                // Final update
+                let finalFullText = fullText
+                await MainActor.run {
+                    if !messages.isEmpty {
+                        messages[0] = .init(role: "assistant", content: .text(finalFullText))
+                    }
+                    
+                    // Update cache
+                    magnet.cachedIntroduction = finalFullText
+                    store.updateMagnet(magnet)
+                    print("✅ [AIDialogView] Generation complete and cached. Length: \(finalFullText.count)")
+                    
+                    // Trigger TTS for the introduction
+                    speechService.speak(finalFullText)
+                }
+            } catch {
+                print("❌ [AIDialogView] Generation failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    errorMessage = "生成失败: \(error.localizedDescription)"
+                    isLoading = false
+                }
             }
         }
     }
     
-    private func generateAIResponse() -> String {
-        let responses = [
-            "\(magnet.name)是一个有趣的收藏品。它代表着特定的文化符号和记忆。\n\n收藏这类物品是一种有意义的爱好，可以通过触觉和视觉来增强记忆效果。",
-            "\(magnet.name)具有独特的设计特点。这类物品通常用于装饰和纪念。\n\n使用冰箱贴收藏是一种有趣的学习方法，可以通过触觉和视觉范围同时记忆，增强儿童的学习效果。",
-            "关于\(magnet.name)：这是一个很有意思的收藏品。\n\n它代表着你在\(magnet.location)的美好回忆。每个冰箱贴都承载着独特的故事和经历。"
-        ]
-        return responses.randomElement() ?? responses[0]
+    private func sendMessage() {
+        let text = userInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        
+        let userMsg = AIService.Message(role: "user", content: .text(text))
+        messages.append(userMsg)
+        userInput = ""
+        isLoading = true
+        
+        Task {
+            do {
+                // Include system prompt for chat
+                var chatMessages = [AIService.Message(role: "system", content: .text(AIService.shared.chatSystemPrompt))]
+                chatMessages.append(contentsOf: messages)
+                
+                let stream = AIService.shared.chatStream(messages: chatMessages, modelType: .powerful)
+                
+                var fullText = ""
+                var hasStarted = false
+                var lastUpdate = Date()
+                
+                for try await text in stream {
+                    if !hasStarted {
+                        await MainActor.run {
+                            isLoading = false
+                            messages.append(.init(role: "assistant", content: .text("")))
+                        }
+                        hasStarted = true
+                    }
+                    
+                    fullText += text
+                    
+                    if Date().timeIntervalSince(lastUpdate) > 0.1 {
+                        let currentText = fullText
+                        await MainActor.run {
+                            if messages.count > 1 {
+                                messages[messages.count - 1] = .init(role: "assistant", content: .text(currentText))
+                            }
+                        }
+                        lastUpdate = Date()
+                    }
+                }
+                
+                // Final update
+                let finalFullText = fullText
+                await MainActor.run {
+                    if messages.count > 1 {
+                        messages[messages.count - 1] = .init(role: "assistant", content: .text(finalFullText))
+                    }
+                    // Trigger TTS for the response
+                    speechService.speak(finalFullText)
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "回复失败: \(error.localizedDescription)"
+                    isLoading = false
+                }
+            }
+        }
+    }
+}
+
+struct MessageBubble: View {
+    let message: AIService.Message
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            if message.role == "user" { Spacer() }
+            
+            if message.role == "assistant" {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundColor(.orange)
+                    .padding(8)
+                    .background(Color.orange.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            
+            VStack(alignment: message.role == "user" ? .trailing : .leading, spacing: 4) {
+                if case .text(let content) = message.content {
+                    Text(content)
+                        .font(.system(size: 16, weight: .medium))
+                        .padding(14)
+                        .background(message.role == "user" ? Color.blue : Color.gray.opacity(0.08))
+                        .foregroundColor(message.role == "user" ? .white : .primary.opacity(0.9))
+                        .cornerRadius(18, corners: message.role == "user" ? [.topLeft, .bottomLeft, .bottomRight] : [.topRight, .bottomLeft, .bottomRight])
+                }
+            }
+            .frame(maxWidth: 300, alignment: message.role == "user" ? .trailing : .leading)
+            
+            if message.role == "user" {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
+                    .padding(8)
+                    .background(Color.blue.opacity(0.1))
+                    .clipShape(Circle())
+            }
+            
+            if message.role == "assistant" { Spacer() }
+        }
+    }
+}
+
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
+        return Path(path.cgPath)
     }
 }
 
