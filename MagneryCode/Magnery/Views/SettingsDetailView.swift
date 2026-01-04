@@ -45,20 +45,26 @@ struct SettingsDetailView: View {
     private var llmSection: some View {
         Group {
             Section(header: Text("描述生成 (Caption Generation)")) {
-                ForEach(["通用", "进阶"], id: \.self) { model in
+                ForEach(AIModelType.allCases, id: \.self) { model in
                     Button(action: {
-                        store.captionModel = model
+                        store.captionModel = model.rawValue
                         store.saveSettings()
                     }) {
-                        HStack {
-                            Text(model)
-                                .foregroundColor(.primary)
-                            Spacer()
-                            if store.captionModel == model {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.purple)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(model.rawValue)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if store.captionModel == model.rawValue {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.purple)
+                                }
                             }
+                            Text(model.description)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
             }

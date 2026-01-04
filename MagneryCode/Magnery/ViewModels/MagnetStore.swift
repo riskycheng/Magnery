@@ -19,7 +19,7 @@ class MagnetStore: ObservableObject {
     
     // Settings
     @Published var systemLanguage: String = "简体中文"
-    @Published var captionModel: String = "通用"
+    @Published var captionModel: String = AIModelType.medium.rawValue
     @Published var dialogueModel: String = "标准"
     
     // Cache for grouped sections to improve performance

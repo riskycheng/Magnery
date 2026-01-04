@@ -573,20 +573,37 @@ struct AddMagnetView: View {
         
         isGeneratingNotes = true
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            let templates = [
-                "这是我收藏的\(name)，它有着独特的设计和精致的细节。",
-                "\(name)是我最喜欢的收藏之一，每次看到它都会想起美好的回忆。",
-                "这个\(name)来自\(location)，它承载着特殊的意义。",
-                "\(name)的造型很有特色，是我珍贵的收藏品。",
-                "收藏的\(name)，记录了一段难忘的时光。"
-            ]
-            
-            self.notes = templates.randomElement() ?? templates[0]
-            self.isGeneratingNotes = false
-            
-            let notification = UINotificationFeedbackGenerator()
-            notification.notificationOccurred(.success)
+        Task {
+            do {
+                let modelType = AIModelType(rawValue: store.captionModel) ?? .medium
+                let generatedNotes = try await AIService.shared.generateCaption(
+                    itemName: name,
+                    location: location,
+                    date: captureDate,
+                    image: image,
+                    modelType: modelType
+                )
+                
+                await MainActor.run {
+                    self.notes = generatedNotes
+                    self.isGeneratingNotes = false
+                    
+                    let notification = UINotificationFeedbackGenerator()
+                    notification.notificationOccurred(.success)
+                }
+            } catch {
+                print("❌ [AddMagnetView] Failed to generate notes: \(error)")
+                await MainActor.run {
+                    self.isGeneratingNotes = false
+                    // Fallback to dummy if API fails
+                    let templates = [
+                        "这是我收藏的\(name)，它有着独特的设计和精致的细节。",
+                        "\(name)是我最喜欢的收藏之一，每次看到它都会想起美好的回忆。",
+                        "这个\(name)来自\(location)，它承载着特殊的意义。"
+                    ]
+                    self.notes = templates.randomElement() ?? templates[0]
+                }
+            }
         }
     }
     

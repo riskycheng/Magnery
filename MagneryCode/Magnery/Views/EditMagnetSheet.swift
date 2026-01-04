@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EditMagnetSheet: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var store: MagnetStore
     @Binding var magnet: MagnetItem
     let onSave: () -> Void
     
@@ -164,17 +165,29 @@ struct EditMagnetSheet: View {
         
         isGeneratingNote = true
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            let aiGeneratedNotes = [
-                "这是一个有趣的收藏品，具有独特的设计和纪念意义。",
-                "来自特定地点的纪念品，承载着美好的回忆和故事。",
-                "精致的工艺品，展现了独特的文化特色和艺术价值。",
-                "值得收藏的物品，记录了特殊时刻和难忘经历。",
-                "独特的设计风格，体现了创作者的巧思和创意。"
-            ]
-            
-            editedNotes = aiGeneratedNotes.randomElement() ?? "一个值得纪念的收藏品。"
-            isGeneratingNote = false
+        Task {
+            do {
+                let modelType = AIModelType(rawValue: store.captionModel) ?? .medium
+                let generatedNotes = try await AIService.shared.generateCaption(
+                    itemName: editedName,
+                    location: magnet.location,
+                    date: magnet.date,
+                    image: ImageManager.shared.loadImage(filename: magnet.imagePath),
+                    modelType: modelType
+                )
+                
+                await MainActor.run {
+                    self.editedNotes = generatedNotes
+                    self.isGeneratingNote = false
+                }
+            } catch {
+                print("❌ [EditMagnetSheet] Failed to generate notes: \(error)")
+                await MainActor.run {
+                    self.isGeneratingNote = false
+                    // Fallback
+                    self.editedNotes = "一个值得纪念的收藏品。"
+                }
+            }
         }
     }
 }
