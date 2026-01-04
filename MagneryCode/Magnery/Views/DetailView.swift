@@ -598,8 +598,8 @@ struct AIDialogView: View {
                                             ForEach(Array(paragraphs.enumerated()), id: \.offset) { index, paragraph in
                                                 let trimmed = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
                                                 if !trimmed.isEmpty {
-                                                    // Add double ideographic space for indentation
-                                                    Text("\u{3000}\u{3000}\(trimmed)")
+                                                    // Add double ideographic space for indentation and support Markdown
+                                                    Text(LocalizedStringKey("\u{3000}\u{3000}\(trimmed)"))
                                                         .font(.system(size: 20, weight: .regular, design: .serif))
                                                         .lineSpacing(16)
                                                         .foregroundColor(.primary.opacity(0.9))
@@ -672,15 +672,7 @@ struct AIDialogView: View {
                                     speechService.stopListening()
                                 } else {
                                     speechService.stopSpeaking()
-                                    speechService.startListening { text in
-                                        if let text = text, !text.isEmpty {
-                                            userInput = text
-                                            withAnimation {
-                                                isShowingChat = true
-                                            }
-                                            sendMessage()
-                                        }
-                                    }
+                                    speechService.startListening { _ in }
                                 }
                             }) {
                                 HStack {
@@ -726,12 +718,7 @@ struct AIDialogView: View {
                                         speechService.stopListening()
                                     } else {
                                         speechService.stopSpeaking()
-                                        speechService.startListening { text in
-                                            if let text = text, !text.isEmpty {
-                                                userInput = text
-                                                sendMessage()
-                                            }
-                                        }
+                                        speechService.startListening { _ in }
                                     }
                                 }) {
                                     Image(systemName: speechService.isListening ? "stop.fill" : "mic.fill")
@@ -779,6 +766,20 @@ struct AIDialogView: View {
         .onDisappear {
             speechService.stopSpeaking()
             speechService.stopListening()
+        }
+        .onChange(of: speechService.recognizedText) { newText in
+            if speechService.isListening {
+                userInput = newText
+            }
+        }
+        .onChange(of: speechService.isListening) { isListening in
+            if !isListening && !userInput.isEmpty && !isLoading {
+                // Auto-send when user stops talking
+                withAnimation {
+                    isShowingChat = true
+                }
+                sendMessage()
+            }
         }
     }
     
@@ -939,7 +940,7 @@ struct MessageBubble: View {
             
             VStack(alignment: message.role == "user" ? .trailing : .leading, spacing: 4) {
                 if case .text(let content) = message.content {
-                    Text(content)
+                    Text(LocalizedStringKey(content))
                         .font(.system(size: 16, weight: .medium))
                         .padding(14)
                         .background(message.role == "user" ? Color.blue : Color.gray.opacity(0.08))

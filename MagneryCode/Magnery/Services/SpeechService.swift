@@ -17,6 +17,9 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     @Published var recognizedText = ""
     @Published var isSpeaking = false
     
+    private var silenceTimer: Timer?
+    private let silenceThreshold: TimeInterval = 1.5 // Seconds of silence before auto-stopping
+    
     override init() {
         super.init()
         speechRecognizer?.delegate = self
@@ -90,23 +93,39 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
             var isFinal = false
             
             if let result = result {
-                self.recognizedText = result.bestTranscription.formattedString
+                let newText = result.bestTranscription.formattedString
+                
+                DispatchQueue.main.async {
+                    self.recognizedText = newText
+                    
+                    // Reset silence timer whenever new text is recognized
+                    self.silenceTimer?.invalidate()
+                    self.silenceTimer = Timer.scheduledTimer(withTimeInterval: self.silenceThreshold, repeats: false) { _ in
+                        print("🤫 [SpeechService] Silence detected, auto-stopping...")
+                        self.stopListening()
+                    }
+                }
                 isFinal = result.isFinal
             }
             
             if error != nil || isFinal {
+                self.silenceTimer?.invalidate()
+                self.silenceTimer = nil
+                
                 self.audioEngine.stop()
                 inputNode.removeTap(onBus: 0)
                 
                 self.recognitionRequest = nil
                 self.recognitionTask = nil
-                self.isListening = false
                 
-                if isFinal {
-                    completion(self.recognizedText)
-                } else if error != nil {
-                    print("❌ [SpeechService] Recognition error: \(error!)")
-                    completion(nil)
+                DispatchQueue.main.async {
+                    self.isListening = false
+                    if isFinal {
+                        completion(self.recognizedText)
+                    } else if error != nil {
+                        print("❌ [SpeechService] Recognition error: \(error!)")
+                        completion(nil)
+                    }
                 }
             }
         }
