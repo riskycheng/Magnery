@@ -558,6 +558,7 @@ struct AIDialogView: View {
     @State private var errorMessage: String?
     @State private var userInput: String = ""
     @State private var isShowingChat = false
+    @State private var activeTask: Task<Void, Never>?
     
     var body: some View {
         let _ = print("🎨 [AIDialogView] Rendering body. Messages: \(messages.count), Loading: \(isLoading)")
@@ -676,6 +677,9 @@ struct AIDialogView: View {
                     if !isShowingChat {
                         HStack(spacing: 16) {
                             Button(action: {
+                                withAnimation {
+                                    isShowingChat = true
+                                }
                                 if speechService.isListening {
                                     speechService.stopListening()
                                 } else {
@@ -760,6 +764,8 @@ struct AIDialogView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("关闭") {
+                        activeTask?.cancel()
+                        activeTask = nil
                         speechService.clearQueue()
                         speechService.stopListening()
                         dismiss()
@@ -772,6 +778,8 @@ struct AIDialogView: View {
             loadIntroduction()
         }
         .onDisappear {
+            activeTask?.cancel()
+            activeTask = nil
             speechService.clearQueue()
             speechService.stopListening()
         }
@@ -792,6 +800,8 @@ struct AIDialogView: View {
     }
     
     private func loadIntroduction(forceRefresh: Bool = false) {
+        activeTask?.cancel()
+        
         if !forceRefresh, let cached = magnet.cachedIntroduction, !cached.isEmpty {
             print("📦 [AIDialogView] Loading from cache. Length: \(cached.count)")
             isLoading = false
@@ -804,7 +814,7 @@ struct AIDialogView: View {
         errorMessage = nil
         messages = []
         
-        Task {
+        activeTask = Task {
             do {
                 print("📖 [AIDialogView] Starting introduction generation for: \(magnet.name)")
                 let image = ImageManager.shared.loadImage(filename: magnet.imagePath ?? "")
@@ -819,9 +829,10 @@ struct AIDialogView: View {
                 var fullText = ""
                 var hasStarted = false
                 var lastUpdate = Date()
-                var ttsBuffer = ""
                 
                 for try await text in stream {
+                    if Task.isCancelled { return }
+                    
                     if !hasStarted {
                         await MainActor.run {
                             isLoading = false
@@ -831,16 +842,6 @@ struct AIDialogView: View {
                     }
                     
                     fullText += text
-                    ttsBuffer += text
-                    
-                    // Check for sentence terminators to trigger streaming TTS
-                    if let lastChar = text.last, "。！？.!?".contains(lastChar) {
-                        let sentence = ttsBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !sentence.isEmpty {
-                            speechService.enqueueAndPlay(sentence)
-                            ttsBuffer = ""
-                        }
-                    }
                     
                     // Throttle UI updates to 10Hz for better performance and smoothness
                     if Date().timeIntervalSince(lastUpdate) > 0.1 {
@@ -854,17 +855,13 @@ struct AIDialogView: View {
                     }
                 }
                 
+                if Task.isCancelled { return }
+                
                 // Final update
                 let finalFullText = fullText
                 await MainActor.run {
                     if !messages.isEmpty {
                         messages[0] = .init(role: "assistant", content: .text(finalFullText))
-                    }
-                    
-                    // Handle remaining text in TTS buffer
-                    let remaining = ttsBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !remaining.isEmpty {
-                        speechService.enqueueAndPlay(remaining)
                     }
                     
                     // Update cache
@@ -873,6 +870,7 @@ struct AIDialogView: View {
                     print("✅ [AIDialogView] Generation complete and cached. Length: \(finalFullText.count)")
                 }
             } catch {
+                if Task.isCancelled { return }
                 print("❌ [AIDialogView] Generation failed: \(error.localizedDescription)")
                 await MainActor.run {
                     errorMessage = "生成失败: \(error.localizedDescription)"
@@ -883,6 +881,8 @@ struct AIDialogView: View {
     }
     
     private func sendMessage() {
+        activeTask?.cancel()
+        
         let text = userInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         
@@ -891,7 +891,7 @@ struct AIDialogView: View {
         userInput = ""
         isLoading = true
         
-        Task {
+        activeTask = Task {
             do {
                 // Include system prompt for chat
                 var chatMessages = [AIService.Message(role: "system", content: .text(AIService.shared.chatSystemPrompt))]
@@ -905,6 +905,8 @@ struct AIDialogView: View {
                 var ttsBuffer = ""
                 
                 for try await text in stream {
+                    if Task.isCancelled { return }
+                    
                     if !hasStarted {
                         await MainActor.run {
                             isLoading = false
@@ -936,6 +938,8 @@ struct AIDialogView: View {
                     }
                 }
                 
+                if Task.isCancelled { return }
+                
                 // Final update
                 let finalFullText = fullText
                 await MainActor.run {
@@ -950,6 +954,7 @@ struct AIDialogView: View {
                     }
                 }
             } catch {
+                if Task.isCancelled { return }
                 await MainActor.run {
                     errorMessage = "回复失败: \(error.localizedDescription)"
                     isLoading = false

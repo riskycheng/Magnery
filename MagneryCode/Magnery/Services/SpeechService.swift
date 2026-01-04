@@ -89,10 +89,15 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     }
     
     func stopSpeaking() {
+        print("🔇 [SpeechService] Stopping all speech...")
         if synthesizer.isSpeaking {
+            print("🔇 [SpeechService] Stopping system synthesizer")
             synthesizer.stopSpeaking(at: .immediate)
         }
-        audioPlayer?.stop()
+        if let player = audioPlayer, player.isPlaying {
+            print("🔇 [SpeechService] Stopping audio player")
+            player.stop()
+        }
         audioPlayer = nil
         isSpeaking = false
     }
@@ -179,8 +184,15 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     }
     
     func stopListening() {
+        print("🛑 [SpeechService] Stopping listening...")
+        silenceTimer?.invalidate()
+        silenceTimer = nil
         audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
         isListening = false
     }
     
@@ -257,6 +269,7 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     }
     
     func clearQueue() {
+        print("🧹 [SpeechService] Clearing audio queue (\(audioQueue.count) items)")
         audioQueue.removeAll()
         stopSpeaking()
         isPlayingQueue = false
@@ -268,11 +281,13 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
         let session = AVAudioSession.sharedInstance()
         do {
             if forPlayback {
-                // Use .playback for maximum volume and routing to main speaker/headphones
-                try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers, .defaultToSpeaker])
+                // .defaultToSpeaker is only for .playAndRecord. 
+                // .playback automatically uses speakers/headphones.
+                try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+                print("🔊 [SpeechService] AudioSession set to .playback")
             } else {
-                // Use .playAndRecord for ASR, but still default to speaker
                 try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetooth])
+                print("🎙️ [SpeechService] AudioSession set to .playAndRecord")
             }
             try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
