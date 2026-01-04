@@ -327,6 +327,11 @@ struct PersonalView: View {
                     .padding(.horizontal)
                 
                 VStack(spacing: 1) {
+                    NavigationLink(destination: ListView(isFavoritesOnly: true)) {
+                        settingsRow(icon: "heart.fill", title: "特别收藏", color: .red)
+                    }
+                    Divider().padding(.leading, 60)
+                    
                     NavigationLink(destination: SettingsDetailView(title: "系统语言")) {
                         settingsRow(icon: "globe", title: "系统语言", color: .blue, value: store.systemLanguage)
                     }

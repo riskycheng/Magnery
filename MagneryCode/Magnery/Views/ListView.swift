@@ -5,15 +5,17 @@ struct ListView: View {
     let group: MagnetGroup?
     let scrollToGroup: Bool
     let scrollToItemId: UUID?
+    let isFavoritesOnly: Bool
     @State private var selectedItemId: UUID? = nil
     @State private var groups: [MagnetGroup] = []
     @State private var itemToShare: MagnetItem? = nil
     @Namespace private var scrollNamespace
     
-    init(group: MagnetGroup? = nil, scrollToGroup: Bool = false, scrollToItemId: UUID? = nil) {
+    init(group: MagnetGroup? = nil, scrollToGroup: Bool = false, scrollToItemId: UUID? = nil, isFavoritesOnly: Bool = false) {
         self.group = group
         self.scrollToGroup = scrollToGroup
         self.scrollToItemId = scrollToItemId
+        self.isFavoritesOnly = isFavoritesOnly
     }
     
     var body: some View {
@@ -25,18 +27,55 @@ struct ListView: View {
                     deselectItem()
                 }
             
-            contentScrollView
+            if groups.isEmpty && isFavoritesOnly {
+                emptyFavoritesView
+            } else {
+                contentScrollView
+            }
         }
         .setTabBarVisibility(false)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(isFavoritesOnly ? "我的收藏" : "")
+        .toolbar {
+            if !isFavoritesOnly {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: ListView(isFavoritesOnly: true)) {
+                        Image(systemName: "heart.fill")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+        }
         .onAppear {
-            groups = store.groupedMagnets()
+            updateGroups()
         }
         .onChange(of: store.magnets) { _ in
-            groups = store.groupedMagnets()
+            updateGroups()
         }
         .sheet(item: $itemToShare) { item in
             SharePreviewView(item: item)
+        }
+    }
+    
+    private var emptyFavoritesView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "heart.slash")
+                .font(.system(size: 60))
+                .foregroundColor(.gray.opacity(0.5))
+            Text("暂无收藏")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            Text("长按冰箱贴并点击爱心即可收藏")
+                .font(.subheadline)
+                .foregroundColor(.secondary.opacity(0.8))
+        }
+    }
+    
+    private func updateGroups() {
+        if isFavoritesOnly {
+            groups = store.groupedMagnets(filter: { $0.favoriteStatus })
+        } else {
+            groups = store.groupedMagnets()
         }
     }
     
@@ -116,11 +155,34 @@ struct ListView: View {
     
     private func actionButtons(for item: MagnetItem) -> some View {
         VStack(spacing: 12) {
+            favoriteButton(for: item)
             shareButton(for: item)
             deleteButton(for: item)
         }
         .offset(x: -8, y: -8)
         .transition(.scale.combined(with: .opacity))
+    }
+    
+    private func favoriteButton(for item: MagnetItem) -> some View {
+        Button(action: {
+            handleToggleFavorite(for: item)
+        }) {
+            Circle()
+                .fill(Color.white)
+                .frame(width: 44, height: 44)
+                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                .overlay(
+                    Image(systemName: item.favoriteStatus ? "heart.fill" : "heart")
+                        .font(.system(size: 20))
+                        .foregroundColor(item.favoriteStatus ? .red : .gray)
+                )
+        }
+    }
+    
+    private func handleToggleFavorite(for item: MagnetItem) {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        store.toggleFavorite(item)
     }
     
     private func shareButton(for item: MagnetItem) -> some View {

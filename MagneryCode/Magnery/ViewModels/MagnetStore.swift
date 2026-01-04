@@ -87,6 +87,16 @@ class MagnetStore: ObservableObject {
         }
     }
     
+    func toggleFavorite(_ magnet: MagnetItem) {
+        if let index = magnets.firstIndex(where: { $0.id == magnet.id }) {
+            var updatedMagnet = magnets[index]
+            updatedMagnet.isFavorite = !(updatedMagnet.isFavorite ?? false)
+            magnets[index] = updatedMagnet
+            saveMagnets()
+            updateSections()
+        }
+    }
+    
     func setGroupingMode(_ mode: GroupingMode) {
         groupingMode = mode
         updateSections()
@@ -173,17 +183,20 @@ class MagnetStore: ObservableObject {
         return location
     }
     
-    func groupedMagnets() -> [MagnetGroup] {
+    func groupedMagnets(filter: ((MagnetItem) -> Bool)? = nil) -> [MagnetGroup] {
+        let itemsToGroup = filter != nil ? magnets.filter(filter!) : magnets
+        
         switch groupingMode {
         case .location:
-            return groupByLocation()
+            return groupByLocation(items: itemsToGroup)
         case .time:
-            return groupByTime()
+            return groupByTime(items: itemsToGroup)
         }
     }
     
-    private func groupByLocation() -> [MagnetGroup] {
-        let grouped = Dictionary(grouping: magnets) { $0.location }
+    private func groupByLocation(items: [MagnetItem]? = nil) -> [MagnetGroup] {
+        let itemsToGroup = items ?? magnets
+        let grouped = Dictionary(grouping: itemsToGroup) { $0.location }
         let colors: [Color] = [
             Color(red: 1.0, green: 0.95, blue: 0.6),
             Color(red: 1.0, green: 0.85, blue: 0.9),
@@ -203,9 +216,10 @@ class MagnetStore: ObservableObject {
         }.sorted { $0.items.count > $1.items.count }
     }
     
-    private func groupByTime() -> [MagnetGroup] {
+    private func groupByTime(items: [MagnetItem]? = nil) -> [MagnetGroup] {
+        let itemsToGroup = items ?? magnets
         let calendar = Calendar.current
-        let grouped = Dictionary(grouping: magnets) { magnet -> Date in
+        let grouped = Dictionary(grouping: itemsToGroup) { magnet -> Date in
             let components = calendar.dateComponents([.year, .month, .day], from: magnet.date)
             return calendar.date(from: components)!
         }

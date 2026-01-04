@@ -12,6 +12,11 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
     var gifPath: String?
     var modelPath: String?
     var notes: String
+    var isFavorite: Bool? = false
+    
+    var favoriteStatus: Bool {
+        isFavorite ?? false
+    }
     
     var isGIF: Bool {
         gifPath != nil
