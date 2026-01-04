@@ -3,7 +3,7 @@ import AVFoundation
 import Speech
 import Combine
 
-class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVSpeechSynthesizerDelegate {
+class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate {
     static let shared = SpeechService()
     
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
@@ -12,6 +12,9 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     private let audioEngine = AVAudioEngine()
     
     private let synthesizer = AVSpeechSynthesizer()
+    private var audioPlayer: AVAudioPlayer?
+    private var audioQueue: [Data] = []
+    private var isPlayingQueue = false
     
     @Published var isListening = false
     @Published var recognizedText = ""
@@ -37,8 +40,29 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     
     // MARK: - TTS (Text to Speech)
     
-    func speak(_ text: String) {
+    func speak(_ text: String, useSiliconFlow: Bool = true) {
+        if useSiliconFlow {
+            Task {
+                do {
+                    let data = try await AIService.shared.fetchTTSAudio(text: text)
+                    await MainActor.run {
+                        self.playAudioData(data)
+                    }
+                } catch {
+                    print("❌ [SpeechService] SiliconFlow TTS failed, falling back to system: \(error)")
+                    await MainActor.run {
+                        self.speakSystem(text)
+                    }
+                }
+            }
+        } else {
+            speakSystem(text)
+        }
+    }
+    
+    private func speakSystem(_ text: String) {
         stopSpeaking()
+        configureAudioSession(forPlayback: true)
         
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: "zh-CN")
@@ -49,10 +73,27 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
         synthesizer.speak(utterance)
     }
     
+    func playAudioData(_ data: Data) {
+        stopSpeaking()
+        configureAudioSession(forPlayback: true)
+        do {
+            audioPlayer = try AVAudioPlayer(data: data)
+            audioPlayer?.delegate = self
+            audioPlayer?.volume = 1.0 // Ensure max volume
+            audioPlayer?.prepareToPlay()
+            audioPlayer?.play()
+            isSpeaking = true
+        } catch {
+            print("❌ [SpeechService] Audio player error: \(error)")
+        }
+    }
+    
     func stopSpeaking() {
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
+        audioPlayer?.stop()
+        audioPlayer = nil
         isSpeaking = false
     }
     
@@ -67,14 +108,7 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
         }
         
         let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: .defaultToSpeaker)
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-        } catch {
-            print("❌ [SpeechService] Audio session error: \(error)")
-            completion(nil)
-            return
-        }
+        configureAudioSession(forPlayback: false)
         
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         
@@ -167,6 +201,82 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         DispatchQueue.main.async {
             self.isSpeaking = false
+        }
+    }
+    
+    // MARK: - AVAudioPlayerDelegate
+    
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        DispatchQueue.main.async {
+            self.isSpeaking = false
+            self.playNextInQueue()
+        }
+    }
+    
+    // MARK: - Streaming TTS Queue
+    
+    func enqueueAndPlay(_ text: String) {
+        Task {
+            do {
+                let data = try await AIService.shared.fetchTTSAudio(text: text)
+                await MainActor.run {
+                    self.audioQueue.append(data)
+                    if !self.isPlayingQueue {
+                        self.playNextInQueue()
+                    }
+                }
+            } catch {
+                print("❌ [SpeechService] Streaming TTS failed, falling back to system: \(error)")
+                await MainActor.run {
+                    self.speakSystem(text)
+                }
+            }
+        }
+    }
+    
+    private func playNextInQueue() {
+        guard !audioQueue.isEmpty else {
+            isPlayingQueue = false
+            return
+        }
+        
+        isPlayingQueue = true
+        configureAudioSession(forPlayback: true)
+        let data = audioQueue.removeFirst()
+        do {
+            audioPlayer = try AVAudioPlayer(data: data)
+            audioPlayer?.delegate = self
+            audioPlayer?.volume = 1.0
+            audioPlayer?.prepareToPlay()
+            audioPlayer?.play()
+            isSpeaking = true
+        } catch {
+            print("❌ [SpeechService] Queue player error: \(error)")
+            playNextInQueue()
+        }
+    }
+    
+    func clearQueue() {
+        audioQueue.removeAll()
+        stopSpeaking()
+        isPlayingQueue = false
+    }
+    
+    // MARK: - Audio Session Management
+    
+    private func configureAudioSession(forPlayback: Bool) {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            if forPlayback {
+                // Use .playback for maximum volume and routing to main speaker/headphones
+                try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers, .defaultToSpeaker])
+            } else {
+                // Use .playAndRecord for ASR, but still default to speaker
+                try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetooth])
+            }
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("❌ [SpeechService] Failed to configure audio session: \(error)")
         }
     }
 }

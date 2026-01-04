@@ -47,6 +47,7 @@ class AIService: ObservableObject {
     
     private let apiKey = "sk-ezwzqwedwhtnbyitbnyohvzanpitqqlnpjucejddpozmpjxj" // SiliconFlow API Key
     private let baseURL = "https://api.siliconflow.cn/v1/chat/completions"
+    private let ttsURL = "https://api.siliconflow.cn/v1/audio/speech"
     
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -72,12 +73,12 @@ class AIService: ObservableObject {
     }
     
     // Multi-modal message structures
-    struct Message: Codable {
+    struct Message: Codable, Equatable {
         let role: String
         let content: MessageContent
     }
     
-    enum MessageContent: Codable {
+    enum MessageContent: Codable, Equatable {
         case text(String)
         case parts([ContentPart])
         
@@ -100,12 +101,12 @@ class AIService: ObservableObject {
         }
     }
     
-    struct ContentPart: Codable {
+    struct ContentPart: Codable, Equatable {
         let type: String
         var text: String? = nil
         var image_url: ImageURL? = nil
         
-        struct ImageURL: Codable {
+        struct ImageURL: Codable, Equatable {
             let url: String
         }
     }
@@ -359,6 +360,47 @@ class AIService: ObservableObject {
                 }
             }
         }
+    }
+    
+    // MARK: - TTS
+    
+    struct TTSRequest: Codable {
+        let model: String
+        let input: String
+        let voice: String
+        var response_format: String = "mp3"
+    }
+    
+    func fetchTTSAudio(text: String) async throws -> Data {
+        guard let url = URL(string: ttsURL) else {
+            throw AIServiceError.requestFailed("无效的 TTS URL")
+        }
+        
+        let requestBody = TTSRequest(
+            model: "FunAudioLLM/CosyVoice2-0.5B",
+            input: text,
+            voice: "FunAudioLLM/CosyVoice2-0.5B:anna"
+        )
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(requestBody)
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AIServiceError.requestFailed("非 HTTP 响应")
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "未知错误"
+            print("❌ [AIService] TTS request failed: \(errorMsg)")
+            throw AIServiceError.requestFailed("TTS 请求失败: \(httpResponse.statusCode)")
+        }
+        
+        return data
     }
     
     private func resizeImage(_ image: UIImage, targetSize: CGSize) -> UIImage {

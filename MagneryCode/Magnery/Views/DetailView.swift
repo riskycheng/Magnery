@@ -645,17 +645,25 @@ struct AIDialogView: View {
                                             .foregroundColor(.secondary)
                                     }
                                     .padding(.horizontal, 20)
-                                    .id("loading")
+                                    .id("loading_indicator")
                                 }
                                 
                                 Spacer(minLength: 50)
+                                    .id("bottom_spacer")
                             }
                             .padding(.bottom, 30)
+                        }
+                        .onChange(of: messages.last?.content) { _ in
+                            if !messages.isEmpty {
+                                withAnimation {
+                                    proxy.scrollTo("bottom_spacer", anchor: .bottom)
+                                }
+                            }
                         }
                         .onChange(of: messages.count) { _ in
                             if !messages.isEmpty {
                                 withAnimation {
-                                    proxy.scrollTo(messages.count - 1, anchor: .bottom)
+                                    proxy.scrollTo("bottom_spacer", anchor: .bottom)
                                 }
                             }
                         }
@@ -671,7 +679,7 @@ struct AIDialogView: View {
                                 if speechService.isListening {
                                     speechService.stopListening()
                                 } else {
-                                    speechService.stopSpeaking()
+                                    speechService.clearQueue()
                                     speechService.startListening { _ in }
                                 }
                             }) {
@@ -688,7 +696,7 @@ struct AIDialogView: View {
                             }
                             
                             Button(action: {
-                                speechService.stopSpeaking()
+                                speechService.clearQueue()
                                 loadIntroduction(forceRefresh: true)
                             }) {
                                 HStack {
@@ -717,7 +725,7 @@ struct AIDialogView: View {
                                     if speechService.isListening {
                                         speechService.stopListening()
                                     } else {
-                                        speechService.stopSpeaking()
+                                        speechService.clearQueue()
                                         speechService.startListening { _ in }
                                     }
                                 }) {
@@ -729,7 +737,7 @@ struct AIDialogView: View {
                                 }
                             } else {
                                 Button(action: {
-                                    speechService.stopSpeaking()
+                                    speechService.clearQueue()
                                     sendMessage()
                                 }) {
                                     Image(systemName: "paperplane.fill")
@@ -752,7 +760,7 @@ struct AIDialogView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("关闭") {
-                        speechService.stopSpeaking()
+                        speechService.clearQueue()
                         speechService.stopListening()
                         dismiss()
                     }
@@ -764,7 +772,7 @@ struct AIDialogView: View {
             loadIntroduction()
         }
         .onDisappear {
-            speechService.stopSpeaking()
+            speechService.clearQueue()
             speechService.stopListening()
         }
         .onChange(of: speechService.recognizedText) { newText in
@@ -811,6 +819,7 @@ struct AIDialogView: View {
                 var fullText = ""
                 var hasStarted = false
                 var lastUpdate = Date()
+                var ttsBuffer = ""
                 
                 for try await text in stream {
                     if !hasStarted {
@@ -822,6 +831,16 @@ struct AIDialogView: View {
                     }
                     
                     fullText += text
+                    ttsBuffer += text
+                    
+                    // Check for sentence terminators to trigger streaming TTS
+                    if let lastChar = text.last, "。！？.!?".contains(lastChar) {
+                        let sentence = ttsBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !sentence.isEmpty {
+                            speechService.enqueueAndPlay(sentence)
+                            ttsBuffer = ""
+                        }
+                    }
                     
                     // Throttle UI updates to 10Hz for better performance and smoothness
                     if Date().timeIntervalSince(lastUpdate) > 0.1 {
@@ -842,13 +861,16 @@ struct AIDialogView: View {
                         messages[0] = .init(role: "assistant", content: .text(finalFullText))
                     }
                     
+                    // Handle remaining text in TTS buffer
+                    let remaining = ttsBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !remaining.isEmpty {
+                        speechService.enqueueAndPlay(remaining)
+                    }
+                    
                     // Update cache
                     magnet.cachedIntroduction = finalFullText
                     store.updateMagnet(magnet)
                     print("✅ [AIDialogView] Generation complete and cached. Length: \(finalFullText.count)")
-                    
-                    // Trigger TTS for the introduction
-                    speechService.speak(finalFullText)
                 }
             } catch {
                 print("❌ [AIDialogView] Generation failed: \(error.localizedDescription)")
@@ -880,6 +902,7 @@ struct AIDialogView: View {
                 var fullText = ""
                 var hasStarted = false
                 var lastUpdate = Date()
+                var ttsBuffer = ""
                 
                 for try await text in stream {
                     if !hasStarted {
@@ -891,6 +914,16 @@ struct AIDialogView: View {
                     }
                     
                     fullText += text
+                    ttsBuffer += text
+                    
+                    // Check for sentence terminators to trigger streaming TTS
+                    if let lastChar = text.last, "。！？.!?".contains(lastChar) {
+                        let sentence = ttsBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !sentence.isEmpty {
+                            speechService.enqueueAndPlay(sentence)
+                            ttsBuffer = ""
+                        }
+                    }
                     
                     if Date().timeIntervalSince(lastUpdate) > 0.1 {
                         let currentText = fullText
@@ -909,8 +942,12 @@ struct AIDialogView: View {
                     if messages.count > 1 {
                         messages[messages.count - 1] = .init(role: "assistant", content: .text(finalFullText))
                     }
-                    // Trigger TTS for the response
-                    speechService.speak(finalFullText)
+                    
+                    // Handle remaining text in TTS buffer
+                    let remaining = ttsBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !remaining.isEmpty {
+                        speechService.enqueueAndPlay(remaining)
+                    }
                 }
             } catch {
                 await MainActor.run {
