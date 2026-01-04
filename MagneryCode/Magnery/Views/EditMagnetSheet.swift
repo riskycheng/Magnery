@@ -167,7 +167,7 @@ struct EditMagnetSheet: View {
         
         Task {
             do {
-                let modelType = AIModelType(rawValue: store.captionModel) ?? .medium
+                let modelType = store.aiModel
                 let generatedNotes = try await AIService.shared.generateCaption(
                     itemName: editedName,
                     location: magnet.location,

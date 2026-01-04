@@ -19,8 +19,7 @@ class MagnetStore: ObservableObject {
     
     // Settings
     @Published var systemLanguage: String = "简体中文"
-    @Published var captionModel: String = AIModelType.medium.rawValue
-    @Published var dialogueModel: String = "标准"
+    @Published var aiModel: AIModelType = .medium
     
     // Cache for grouped sections to improve performance
     @Published var sections: [SectionData] = []
@@ -52,8 +51,7 @@ class MagnetStore: ObservableObject {
     func saveSettings() {
         let settings = [
             "language": systemLanguage,
-            "captionModel": captionModel,
-            "dialogueModel": dialogueModel
+            "aiModel": aiModel.rawValue
         ]
         UserDefaults.standard.set(settings, forKey: settingsKey)
     }
@@ -61,8 +59,11 @@ class MagnetStore: ObservableObject {
     private func loadSettings() {
         if let settings = UserDefaults.standard.dictionary(forKey: settingsKey) {
             systemLanguage = settings["language"] as? String ?? "简体中文"
-            captionModel = settings["captionModel"] as? String ?? "通用"
-            dialogueModel = settings["dialogueModel"] as? String ?? "标准"
+            if let modelRaw = settings["aiModel"] as? String, let model = AIModelType(rawValue: modelRaw) {
+                aiModel = model
+            } else {
+                aiModel = .medium
+            }
         }
     }
     

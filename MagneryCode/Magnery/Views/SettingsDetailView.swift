@@ -8,8 +8,6 @@ struct SettingsDetailView: View {
         List {
             if title == "系统语言" {
                 languageSection
-            } else if title == "大模型选择" {
-                llmSection
             } else {
                 placeholderSection
             }
@@ -39,54 +37,6 @@ struct SettingsDetailView: View {
             }
         } footer: {
             Text("更改语言后可能需要重启应用以完全生效。")
-        }
-    }
-    
-    private var llmSection: some View {
-        Group {
-            Section(header: Text("描述生成 (Caption Generation)")) {
-                ForEach(AIModelType.allCases, id: \.self) { model in
-                    Button(action: {
-                        store.captionModel = model.rawValue
-                        store.saveSettings()
-                    }) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text(model.rawValue)
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if store.captionModel == model.rawValue {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(.purple)
-                                }
-                            }
-                            Text(model.description)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            
-            Section(header: Text("对话 (Dialogue)")) {
-                ForEach(["通用", "标准", "多模态"], id: \.self) { model in
-                    Button(action: {
-                        store.dialogueModel = model
-                        store.saveSettings()
-                    }) {
-                        HStack {
-                            Text(model)
-                                .foregroundColor(.primary)
-                            Spacer()
-                            if store.dialogueModel == model {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.purple)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
     

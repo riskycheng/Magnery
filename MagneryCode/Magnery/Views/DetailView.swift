@@ -823,7 +823,7 @@ struct AIDialogView: View {
                     location: magnet.location,
                     date: magnet.date,
                     image: image,
-                    modelType: .powerful
+                    modelType: store.aiModel
                 )
                 
                 var fullText = ""
@@ -897,7 +897,7 @@ struct AIDialogView: View {
                 var chatMessages = [AIService.Message(role: "system", content: .text(AIService.shared.chatSystemPrompt))]
                 chatMessages.append(contentsOf: messages)
                 
-                let stream = AIService.shared.chatStream(messages: chatMessages, modelType: .powerful)
+                let stream = AIService.shared.chatStream(messages: chatMessages, modelType: store.aiModel)
                 
                 var fullText = ""
                 var hasStarted = false

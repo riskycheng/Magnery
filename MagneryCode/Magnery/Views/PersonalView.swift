@@ -342,10 +342,56 @@ struct PersonalView: View {
                     }) {
                         settingsRow(icon: "trash.fill", title: "清理缓存", color: .red)
                     }
-                    Divider().padding(.leading, 60)
-                    
-                    NavigationLink(destination: SettingsDetailView(title: "大模型选择")) {
-                        settingsRow(icon: "cpu.fill", title: "大模型选择", color: .purple)
+                }
+                .background(Color.white)
+                .cornerRadius(20)
+                .padding(.horizontal)
+                .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+            }
+            
+            // Section: AI Model Selection
+            VStack(alignment: .leading, spacing: 12) {
+                Text("AI 模型选择")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .padding(.horizontal)
+                
+                VStack(spacing: 1) {
+                    ForEach(AIModelType.allCases, id: \.self) { model in
+                        Button(action: {
+                            withAnimation {
+                                store.aiModel = model
+                                store.saveSettings()
+                            }
+                        }) {
+                            HStack(spacing: 16) {
+                                Image(systemName: store.aiModel == model ? "cpu.fill" : "cpu")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(store.aiModel == model ? .purple : .gray)
+                                    .frame(width: 32)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(model.rawValue)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.primary)
+                                    Text(model.description)
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                if store.aiModel == model {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.purple)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                        }
+                        
+                        if model != AIModelType.allCases.last {
+                            Divider().padding(.leading, 60)
+                        }
                     }
                 }
                 .background(Color.white)
