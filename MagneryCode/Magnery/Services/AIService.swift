@@ -4,29 +4,29 @@ import SwiftUI
 import Combine
 
 enum AIModelType: String, CaseIterable {
-    case easy = "基础版 (VL-32B)"
-    case medium = "专业版 (VL-30B-Thinking)"
-    case powerful = "旗舰版 (VL-32B-Instruct)"
+    case easy = "基础版 (7B)"
+    case medium = "专业版 (8B)"
+    case powerful = "旗舰版 (30B)"
     
     var modelName: String {
         switch self {
         case .easy:
-            return "Qwen/Qwen2.5-VL-32B-Instruct"
+            return "Pro/Qwen/Qwen2.5-VL-7B-Instruct"
         case .medium:
-            return "Qwen/Qwen3-VL-30B-A3B-Thinking"
+            return "Qwen/Qwen3-VL-8B-Instruct"
         case .powerful:
-            return "Qwen/Qwen3-VL-32B-Instruct"
+            return "Qwen/Qwen3-VL-30B-A3B-Instruct"
         }
     }
     
     var description: String {
         switch self {
         case .easy:
-            return "快速视觉识别，生成简洁描述"
+            return "响应速度最快，适用于快速生成简短描述"
         case .medium:
-            return "深度思考模式，挖掘物品背后的细节"
+            return "速度与准确度的最佳平衡"
         case .powerful:
-            return "最强视觉理解，生成极具质感的描述"
+            return "生成效果最佳，但响应速度可能较慢"
         }
     }
 }

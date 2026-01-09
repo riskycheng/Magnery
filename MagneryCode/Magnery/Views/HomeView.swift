@@ -66,8 +66,8 @@ struct HomeView: View {
                             VStack(spacing: 0) {
                                 // Mode and Grouping toggle
                                 modeAndGroupingToggle
-                                    .padding(.top, 15)
-                                    .padding(.bottom, 25)
+                                    .padding(.top, 28)
+                                    .padding(.bottom, 8)
                                 
                                 // Content list
                                 contentList
@@ -481,84 +481,165 @@ struct HomeView: View {
     
     private var modeAndGroupingToggle: some View {
         HStack(spacing: 12) {
-            // Mode Switcher (Camera / Map) - Custom Segmented Control
-            HStack(spacing: 0) {
-                ForEach([HomeMode.camera, HomeMode.map], id: \.self) { mode in
-                    Button(action: {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            homeMode = mode
-                        }
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: mode == .camera ? "viewfinder" : "map.fill")
-                                .font(Font.system(size: 11, weight: .bold))
-                            
-                            if homeMode == mode {
-                                Text(mode == .camera ? "相机" : "地图")
-                                    .font(Font.system(size: 12, weight: .bold, design: .rounded))
-                                    .transition(.opacity.combined(with: .move(edge: .leading)))
-                            }
-                        }
-                        .foregroundColor(homeMode == mode ? .white : .secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(
-                            ZStack {
-                                if homeMode == mode {
-                                    Capsule()
-                                        .fill(Color.black)
-                                        .matchedGeometryEffect(id: "modeTab", in: modeNamespace)
-                                }
-                            }
-                        )
-                    }
-                }
-            }
-            .padding(3)
-            .background(Color.black.opacity(0.04))
-            .clipShape(Capsule())
+            modeSwitcher
             
             Spacer()
             
-            // Grouping Toggle (Location / Time) - Refined Pill
-            Button(action: {
-                let impact = UIImpactFeedbackGenerator(style: .light)
-                impact.impactOccurred()
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                    store.setGroupingMode(store.groupingMode == .location ? .time : .location)
-                }
-            }) {
-                HStack(spacing: 8) {
-                    ZStack {
-                        Image(systemName: "mappin.and.ellipse")
-                            .opacity(store.groupingMode == .location ? 1 : 0)
-                            .scaleEffect(store.groupingMode == .location ? 1 : 0.5)
-                        Image(systemName: "calendar")
-                            .opacity(store.groupingMode == .time ? 1 : 0)
-                            .scaleEffect(store.groupingMode == .time ? 1 : 0.5)
-                    }
-                    .font(Font.system(size: 12, weight: .bold))
-                    
-                    Text(store.groupingMode == .location ? "按地点" : "按日期")
-                        .font(Font.system(size: 12, weight: .bold, design: .rounded))
-                }
-                .foregroundColor(.primary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(Color.white)
-                        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-                )
+            groupingSwitcher
+        }
+        .padding(.horizontal, 24)
+    }
+    
+    private var modeSwitcher: some View {
+        ZStack(alignment: .leading) {
+            Capsule()
+                .fill(Color.black.opacity(0.04))
                 .overlay(
                     Capsule()
-                        .stroke(Color.black.opacity(0.03), lineWidth: 1)
+                        .stroke(Color.black.opacity(0.02), lineWidth: 0.5)
                 )
+            
+            HStack(spacing: 0) {
+                ForEach([HomeMode.camera, HomeMode.map], id: \.self) { mode in
+                    modeSegment(for: mode)
+                }
+            }
+            .background(modeSelectionIndicator)
+        }
+        .frame(width: 140) 
+        .clipShape(Capsule())
+        .gesture(modeDragGesture)
+    }
+
+    private func modeSegment(for mode: HomeMode) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: mode == .camera ? "viewfinder" : "map.fill")
+                .font(Font.system(size: 13, weight: .bold))
+            
+            if homeMode == mode {
+                Text(mode == .camera ? "相机" : "地图")
+                    .font(Font.system(size: 13, weight: .bold, design: .rounded))
+                    .transition(.opacity.combined(with: .move(edge: .leading)))
             }
         }
-        .padding(.horizontal, 28)
+        .foregroundColor(homeMode == mode ? .primary : .secondary.opacity(0.8))
+        .frame(maxWidth: .infinity)
+        .frame(height: 40)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                homeMode = mode
+            }
+        }
+    }
+
+    private var modeSelectionIndicator: some View {
+        GeometryReader { geo in
+            let width = geo.size.width / 2
+            Capsule()
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                .frame(width: width - 4)
+                .offset(x: homeMode == .camera ? 2 : width + 2)
+        }
+    }
+
+    private var modeDragGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let midPoint = 70.0 // Half of 140
+                if value.location.x < midPoint && homeMode == .map {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        homeMode = .camera
+                    }
+                } else if value.location.x > midPoint && homeMode == .camera {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        homeMode = .map
+                    }
+                }
+            }
+    }
+    
+    private var groupingSwitcher: some View {
+        ZStack(alignment: .leading) {
+            Capsule()
+                .fill(Color.black.opacity(0.04))
+                .overlay(
+                    Capsule()
+                        .stroke(Color.black.opacity(0.02), lineWidth: 0.5)
+                )
+            
+            HStack(spacing: 0) {
+                ForEach([GroupingMode.location, GroupingMode.time], id: \.self) { mode in
+                    groupingSegment(for: mode)
+                }
+            }
+            .background(groupingSelectionIndicator)
+        }
+        .frame(width: 140)
+        .clipShape(Capsule())
+        .gesture(groupingDragGesture)
+    }
+
+    private func groupingSegment(for mode: GroupingMode) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: mode == .location ? "mappin.and.ellipse" : "calendar")
+                .font(Font.system(size: 13, weight: .bold))
+            
+            if store.groupingMode == mode {
+                Text(mode == .location ? "地点" : "日期")
+                    .font(Font.system(size: 13, weight: .bold, design: .rounded))
+                    .transition(.opacity.combined(with: .move(edge: .leading)))
+            }
+        }
+        .foregroundColor(store.groupingMode == mode ? .primary : .secondary.opacity(0.8))
+        .frame(maxWidth: .infinity)
+        .frame(height: 40)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                store.setGroupingMode(mode)
+            }
+        }
+    }
+
+    private var groupingSelectionIndicator: some View {
+        GeometryReader { geo in
+            let width = geo.size.width / 2
+            Capsule()
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                .frame(width: width - 4)
+                .offset(x: store.groupingMode == .location ? 2 : width + 2)
+        }
+    }
+
+    private var groupingDragGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let midPoint = 70.0 // Half of 140
+                if value.location.x < midPoint && store.groupingMode == .time {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        store.setGroupingMode(.location)
+                    }
+                } else if value.location.x > midPoint && store.groupingMode == .location {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        store.setGroupingMode(.time)
+                    }
+                }
+            }
     }
     
     private var greeting: String {

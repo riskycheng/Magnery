@@ -18,7 +18,6 @@ class MagnetStore: ObservableObject {
     @Published var userAvatarPath: String? = nil
     
     // Settings
-    @Published var systemLanguage: String = "简体中文"
     @Published var aiModel: AIModelType = .medium
     
     // Cache for grouped sections to improve performance
@@ -50,7 +49,6 @@ class MagnetStore: ObservableObject {
     
     func saveSettings() {
         let settings = [
-            "language": systemLanguage,
             "aiModel": aiModel.rawValue
         ]
         UserDefaults.standard.set(settings, forKey: settingsKey)
@@ -58,7 +56,6 @@ class MagnetStore: ObservableObject {
     
     private func loadSettings() {
         if let settings = UserDefaults.standard.dictionary(forKey: settingsKey) {
-            systemLanguage = settings["language"] as? String ?? "简体中文"
             if let modelRaw = settings["aiModel"] as? String, let model = AIModelType(rawValue: modelRaw) {
                 aiModel = model
             } else {

@@ -332,11 +332,6 @@ struct PersonalView: View {
                     }
                     Divider().padding(.leading, 60)
                     
-                    NavigationLink(destination: SettingsDetailView(title: "系统语言")) {
-                        settingsRow(icon: "globe", title: "系统语言", color: .blue, value: store.systemLanguage)
-                    }
-                    Divider().padding(.leading, 60)
-                    
                     Button(action: {
                         showingCacheAlert = true
                     }) {
@@ -440,11 +435,44 @@ struct PersonalView: View {
         .alert("清理缓存", isPresented: $showingCacheAlert) {
             Button("取消", role: .cancel) { }
             Button("清理", role: .destructive) {
-                // Implement cache clearing logic here if needed
+                clearAppCache()
             }
         } message: {
-            Text("确定要清理应用缓存吗？这将释放存储空间。")
+            Text("确定要清理应用缓存吗？这将删除从社区下载的所有图片和模型。")
         }
+    }
+    
+    private func clearAppCache() {
+        let fileManager = FileManager.default
+        
+        // 1. Clear ImageCache in Caches directory
+        if let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            let imageCacheURL = cachesURL.appendingPathComponent("ImageCache")
+            try? fileManager.removeItem(at: imageCacheURL)
+            print("🧹 [PersonalView] Image cache cleared")
+        }
+        
+        // 2. Clear manifest cache if any (CommunityService might use this)
+        if let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let manifestURL = documentsURL.appendingPathComponent("community_manifest.json")
+            try? fileManager.removeItem(at: manifestURL)
+            
+            // Also clear any other community related cached JSONs
+            let contents = try? fileManager.contentsOfDirectory(at: documentsURL, includingPropertiesForKeys: nil)
+            contents?.forEach { url in
+                if url.lastPathComponent.hasPrefix("community_") && url.pathExtension == "json" {
+                    try? fileManager.removeItem(at: url)
+                }
+            }
+        }
+        
+        // 3. Clear temporary directory
+        let tempDir = fileManager.temporaryDirectory
+        if let tempContents = try? fileManager.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil) {
+            tempContents.forEach { try? fileManager.removeItem(at: $0) }
+        }
+        
+        print("✅ [PersonalView] All caches cleared")
     }
     
     private var footerSection: some View {
@@ -454,7 +482,7 @@ struct PersonalView: View {
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundColor(.secondary.opacity(0.8))
                 
-                Text("Mangery")
+                Text("Magnery")
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundColor(.primary.opacity(0.9))
             }
