@@ -29,13 +29,8 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
         synthesizer.delegate = self
         
         // Request permissions
-        SFSpeechRecognizer.requestAuthorization { status in
-            print("🎤 [SpeechService] Authorization status: \(status)")
-        }
-        
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            print("🎤 [SpeechService] Record permission: \(granted)")
-        }
+        SFSpeechRecognizer.requestAuthorization { _ in }
+        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
     }
     
     // MARK: - TTS (Text to Speech)
@@ -89,13 +84,10 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     }
     
     func stopSpeaking() {
-        print("🔇 [SpeechService] Stopping all speech...")
         if synthesizer.isSpeaking {
-            print("🔇 [SpeechService] Stopping system synthesizer")
             synthesizer.stopSpeaking(at: .immediate)
         }
         if let player = audioPlayer, player.isPlaying {
-            print("🔇 [SpeechService] Stopping audio player")
             player.stop()
         }
         audioPlayer = nil
@@ -140,7 +132,6 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
                     // Reset silence timer whenever new text is recognized
                     self.silenceTimer?.invalidate()
                     self.silenceTimer = Timer.scheduledTimer(withTimeInterval: self.silenceThreshold, repeats: false) { _ in
-                        print("🤫 [SpeechService] Silence detected, auto-stopping...")
                         self.stopListening()
                     }
                 }
@@ -184,7 +175,6 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     }
     
     func stopListening() {
-        print("🛑 [SpeechService] Stopping listening...")
         silenceTimer?.invalidate()
         silenceTimer = nil
         audioEngine.stop()
@@ -269,7 +259,6 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
     }
     
     func clearQueue() {
-        print("🧹 [SpeechService] Clearing audio queue (\(audioQueue.count) items)")
         audioQueue.removeAll()
         stopSpeaking()
         isPlayingQueue = false
@@ -284,10 +273,8 @@ class SpeechService: NSObject, ObservableObject, SFSpeechRecognizerDelegate, AVS
                 // .defaultToSpeaker is only for .playAndRecord. 
                 // .playback automatically uses speakers/headphones.
                 try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-                print("🔊 [SpeechService] AudioSession set to .playback")
             } else {
                 try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetooth])
-                print("🎙️ [SpeechService] AudioSession set to .playAndRecord")
             }
             try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {

@@ -142,8 +142,6 @@ class AIService: ObservableObject {
     }
     
     private func performChatRequest(_ requestBody: ChatRequest) async throws -> String {
-        print("🚀 [AIService] Starting non-stream request. Model: \(requestBody.model), Messages: \(requestBody.messages.count)")
-        
         guard let url = URL(string: baseURL) else {
             throw AIServiceError.requestFailed("无效的 URL")
         }
@@ -158,18 +156,15 @@ class AIService: ObservableObject {
         
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             let errorMsg = String(data: data, encoding: .utf8) ?? "未知错误"
-            print("❌ [AIService] Request failed with status: \((response as? HTTPURLResponse)?.statusCode ?? -1). Error: \(errorMsg)")
             throw AIServiceError.requestFailed(errorMsg)
         }
         
         let apiResponse = try JSONDecoder().decode(ChatResponse.self, from: data)
         
         guard let content = apiResponse.choices.first?.message.content else {
-            print("❌ [AIService] Invalid response format")
             throw AIServiceError.invalidResponse
         }
         
-        print("✅ [AIService] Request completed. Response length: \(content.count)")
         return content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
@@ -288,9 +283,6 @@ class AIService: ObservableObject {
     }
 
     func chatStream(messages: [Message], modelType: AIModelType, temperature: Double = 0.7) -> AsyncThrowingStream<String, Error> {
-        print("🌊 [AIService] Starting stream request. Model: \(modelType.modelName), Messages: \(messages.count)")
-        let startTime = Date()
-        
         return AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -314,21 +306,14 @@ class AIService: ObservableObject {
                     let (bytes, response) = try await session.bytes(for: request)
                     
                     guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                        print("❌ [AIService] Stream request failed with status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
                         continuation.finish(throwing: AIServiceError.requestFailed("服务器响应错误"))
                         return
                     }
-                    
-                    var tokenCount = 0
-                    var firstTokenTime: Date?
                     
                     for try await line in bytes.lines {
                         if line.hasPrefix("data: ") {
                             let dataString = line.replacingOccurrences(of: "data: ", with: "")
                             if dataString == "[DONE]" {
-                                let duration = Date().timeIntervalSince(firstTokenTime ?? startTime)
-                                let speed = duration > 0 ? Double(tokenCount) / duration : 0
-                                print(String(format: "🏁 [AIService] Stream finished. 「tokens: %d, speed: %.2f tokens/s」", tokenCount, speed))
                                 continuation.finish()
                                 return
                             }
@@ -336,26 +321,12 @@ class AIService: ObservableObject {
                             if let data = dataString.data(using: .utf8),
                                let streamResponse = try? JSONDecoder().decode(ChatStreamResponse.self, from: data),
                                let content = streamResponse.choices.first?.delta.content {
-                                if firstTokenTime == nil {
-                                    firstTokenTime = Date()
-                                    let latency = firstTokenTime!.timeIntervalSince(startTime)
-                                    print(String(format: "✨ [AIService] First token received. Latency: %.2fs", latency))
-                                }
-                                
-                                tokenCount += 1
-                                if tokenCount % 20 == 0 {
-                                    print("📥 [AIService] Received \(tokenCount) tokens...")
-                                }
                                 continuation.yield(content)
                             }
                         }
                     }
-                    let duration = Date().timeIntervalSince(firstTokenTime ?? startTime)
-                    let speed = duration > 0 ? Double(tokenCount) / duration : 0
-                    print(String(format: "🏁 [AIService] Stream ended. 「tokens: %d, speed: %.2f tokens/s」", tokenCount, speed))
                     continuation.finish()
                 } catch {
-                    print("❌ [AIService] Stream error: \(error.localizedDescription)")
                     continuation.finish(throwing: error)
                 }
             }

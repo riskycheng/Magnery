@@ -88,7 +88,6 @@ class CameraManager: NSObject, ObservableObject {
             
             self.session.commitConfiguration()
             self.isConfigured = true
-            print("✅ [CameraManager] Camera setup complete")
         }
     }
     
@@ -117,14 +116,12 @@ class CameraManager: NSObject, ObservableObject {
             self.isProcessingFrames = true // Start showing processing state immediately
             self.processingProgress = 0
             self.frameCounter = 0
-            print("⏺️ [CameraManager] Started recording frames")
         }
     }
     
     func stopRecording() {
         DispatchQueue.main.async {
             self.isRecording = false
-            print("⏹️ [CameraManager] Stopped recording frames, captured \(self.totalCapturedCount) frames")
             self.checkProcessingCompletion()
         }
     }
@@ -135,7 +132,6 @@ class CameraManager: NSObject, ObservableObject {
             let sortedFrames = processedResults.keys.sorted().compactMap { processedResults[$0] }
             self.segmentedFrames = sortedFrames
             self.isProcessingFrames = false
-            print("✅ [CameraManager] Finished processing all \(sortedFrames.count) frames")
         }
     }
     
@@ -162,7 +158,6 @@ class CameraManager: NSObject, ObservableObject {
             guard let self = self else { return }
             if self.session.isRunning {
                 self.session.stopRunning()
-                print("⏹️ [CameraManager] Session stopped")
             }
         }
     }
@@ -171,18 +166,15 @@ class CameraManager: NSObject, ObservableObject {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             guard self.isAuthorized else { 
-                print("⚠️ [CameraManager] Cannot start session: Not authorized")
                 return 
             }
             
             if !self.isConfigured {
-                print("⚠️ [CameraManager] Session not configured yet, skipping start")
                 return
             }
             
             if !self.session.isRunning {
                 self.session.startRunning()
-                print("▶️ [CameraManager] Session started")
             }
         }
     }
@@ -306,7 +298,6 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
         do {
             try imageData.write(to: tempURL)
             ImageMetadataCache.shared.storeFileURL(tempURL)
-            print("✅ [PhotoCaptureDelegate] Saved photo with metadata to: \(tempURL.lastPathComponent)")
         } catch {
             print("❌ [PhotoCaptureDelegate] Failed to save temp file: \(error.localizedDescription)")
         }

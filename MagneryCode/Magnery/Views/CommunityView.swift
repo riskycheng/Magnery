@@ -83,9 +83,7 @@ struct CommunityView: View {
                 }
                 
                 // 2. Trigger the fetch immediately
-                print("📱 [CommunityView] onAppear triggered")
                 if communityService.popularMagnets.isEmpty {
-                    print("📱 [CommunityView] Starting fetch because magnets are empty")
                     communityService.fetchCommunityContent()
                 }
             }

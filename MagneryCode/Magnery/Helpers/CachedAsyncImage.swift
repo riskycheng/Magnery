@@ -102,8 +102,6 @@ struct CachedAsyncImage: View {
             return
         }
         
-        print("🌐 [CachedAsyncImage] Trying URL (\(currentURLIndex == -1 ? "Primary" : "Fallback \(currentURLIndex)")): \(activeURL.absoluteString)")
-        
         // Check cache - use a sanitized version of the URL as the key
         let cacheKey = activeURL.absoluteString.components(separatedBy: CharacterSet.alphanumerics.inverted).joined()
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("ImageCache")
@@ -115,7 +113,6 @@ struct CachedAsyncImage: View {
         let cachedFileURL = cacheDir.appendingPathComponent(cacheKey)
         
         if let cachedData = try? Data(contentsOf: cachedFileURL), let cachedImage = UIImage(data: cachedData) {
-            print("📦 [CachedAsyncImage] Using cache for: \(activeURL.lastPathComponent)")
             self.image = cachedImage
             self.hasError = false
             return
@@ -124,12 +121,10 @@ struct CachedAsyncImage: View {
             try? FileManager.default.removeItem(at: cachedFileURL)
         }
         
-        print("🌐 [CachedAsyncImage] Downloading: \(activeURL.absoluteString)")
         // Download
         Task {
             do {
                 let tempURL = try await downloadManager.download(url: activeURL, to: cachedFileURL)
-                print("✅ [CachedAsyncImage] Download finished: \(activeURL.lastPathComponent)")
                 
                 if let data = try? Data(contentsOf: tempURL), let downloadedImage = UIImage(data: data) {
                     // Save to cache
@@ -140,12 +135,10 @@ struct CachedAsyncImage: View {
                     self.image = downloadedImage
                     self.hasError = false
                 } else {
-                    print("❌ [CachedAsyncImage] Failed to create image from data: \(activeURL.lastPathComponent)")
                     try? FileManager.default.removeItem(at: tempURL)
                     tryNextURL()
                 }
             } catch {
-                print("❌ [CachedAsyncImage] Error: \(error.localizedDescription)")
                 tryNextURL()
             }
         }

@@ -83,11 +83,9 @@ struct PersonalView: View {
                                 selectedItem = nil
                             }
                         } else {
-                            print("Failed to load image data")
                             await MainActor.run { selectedItem = nil }
                         }
                     } catch {
-                        print("Error loading image: \(error)")
                         await MainActor.run { selectedItem = nil }
                     }
                 }
@@ -191,11 +189,6 @@ struct PersonalView: View {
     }
     
     private func handleScroll(_ value: CGFloat) {
-        // Debug log to verify tracking
-        if abs(value - scrollOffset) > 2 {
-            print("📜 [PersonalView] Scroll Offset: \(value)")
-        }
-        
         if abs(value - scrollOffset) < scrollUpdateThreshold {
             return
         }
@@ -207,7 +200,6 @@ struct PersonalView: View {
         
         if newCollapsed != isCollapsed {
             isCollapsed = newCollapsed
-            print("🔄 [PersonalView] Header State: \(newCollapsed ? "DOCKED" : "EXPANDED")")
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred(intensity: newCollapsed ? 0.8 : 0.5)
         }
@@ -449,7 +441,6 @@ struct PersonalView: View {
         if let cachesURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
             let imageCacheURL = cachesURL.appendingPathComponent("ImageCache")
             try? fileManager.removeItem(at: imageCacheURL)
-            print("🧹 [PersonalView] Image cache cleared")
         }
         
         // 2. Clear manifest cache if any (CommunityService might use this)
@@ -471,8 +462,6 @@ struct PersonalView: View {
         if let tempContents = try? fileManager.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil) {
             tempContents.forEach { try? fileManager.removeItem(at: $0) }
         }
-        
-        print("✅ [PersonalView] All caches cleared")
     }
     
     private var footerSection: some View {

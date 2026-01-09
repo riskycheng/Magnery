@@ -14,11 +14,7 @@ class VisionService {
     private init() {}
     
     func removeBackground(from image: UIImage, completion: @escaping (SegmentationResult?) -> Void) {
-        print("[VisionService] 开始背景分割处理...")
-        print("[VisionService] 原始图片尺寸: \(image.size), 方向: \(image.imageOrientation.rawValue)")
-        
         guard let cgImage = image.cgImage else {
-            print("[VisionService] ❌ 无法获取 CGImage")
             completion(nil)
             return
         }
@@ -27,18 +23,13 @@ class VisionService {
             let request = VNGenerateForegroundInstanceMaskRequest()
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
             
-            print("[VisionService] 开始执行 Vision 请求...")
             do {
                 try handler.perform([request])
-                print("[VisionService] ✓ Vision 请求完成")
                 
                 guard let result = request.results?.first as? VNInstanceMaskObservation else {
-                    print("[VisionService] ❌ 未检测到前景对象")
                     DispatchQueue.main.async { completion(nil) }
                     return
                 }
-                
-                print("[VisionService] ✓ 检测到 \(result.allInstances.count) 个前景对象")
                 
                 let instancesToUse = self.selectSubjectInstances(from: result)
                 let maskedPixelBuffer = try result.generateMaskedImage(
@@ -47,8 +38,6 @@ class VisionService {
                     croppedToInstancesExtent: true
                 )
                 
-                print("[VisionService] ✓ 生成前景蒙版图像成功")
-                
                 let ciImage = CIImage(cvPixelBuffer: maskedPixelBuffer)
                 let context = CIContext()
                 
@@ -56,12 +45,10 @@ class VisionService {
                     let outputImage = UIImage(cgImage: outputCGImage, scale: image.scale, orientation: image.imageOrientation)
                     self.finishProcessing(image: outputImage, completion: completion)
                 } else {
-                     print("[VisionService] ❌ 无法创建输出图像")
                      DispatchQueue.main.async { completion(nil) }
                 }
                 
             } catch {
-                print("[VisionService] ❌ 执行 Vision 请求失败: \(error)")
                 DispatchQueue.main.async { completion(nil) }
             }
         }
@@ -105,7 +92,6 @@ class VisionService {
             completion(normalizedImage)
             
         } catch {
-            print("[VisionService] Batch segmentation error: \(error)")
             completion(nil)
         }
     }
@@ -139,10 +125,7 @@ class VisionService {
     }
     
     private func finishProcessing(image: UIImage, completion: @escaping (SegmentationResult?) -> Void) {
-        print("[VisionService] ✓ 分割完成，输出图片尺寸: \(image.size)")
-        
         let contourPath = self.extractContour(from: image)
-        print("[VisionService] ✓ 提取轮廓路径完成")
         
         let result = SegmentationResult(image: image, contourPath: contourPath)
         DispatchQueue.main.async {
@@ -236,11 +219,8 @@ class VisionService {
         }
         
         guard !boundaryPixels.isEmpty else {
-            print("[VisionService] ❌ 未找到边界像素")
             return nil
         }
-        
-        print("[VisionService] ✓ 找到 \(boundaryPixels.count) 个边界像素")
         
         // Convert to set for fast lookup
         var boundarySet = Set(boundaryPixels.map { "\($0.x),\($0.y)" })
@@ -305,8 +285,6 @@ class VisionService {
             
         } while orderedPixels.count < boundaryPixels.count && orderedPixels.count < 10000
         
-        print("[VisionService] ✓ 追踪到 \(orderedPixels.count) 个有序边界点")
-        
         // Sample points to reduce complexity
         let targetPoints = 120
         let step = max(1, orderedPixels.count / targetPoints)
@@ -357,8 +335,6 @@ class VisionService {
             path.closeSubpath()
         }
         
-        print("[VisionService] ✓ 轮廓采样: \(sampledPixels.count) 个点")
-        
         return path
     }
     
@@ -371,8 +347,6 @@ class VisionService {
     private func selectSubjectInstances(from observation: VNInstanceMaskObservation) -> IndexSet {
         let allInstances = observation.allInstances
         if allInstances.count <= 1 { return allInstances }
-        
-        print("[VisionService] Analyzing \(allInstances.count) instances for subject selection...")
         
         let mask = observation.instanceMask
         
@@ -425,9 +399,6 @@ class VisionService {
             
             let distSq = pow(boxCenterX - centerX, 2) + pow(boxCenterY - centerY, 2)
             
-            // Log for debugging
-            print("[VisionService] Instance \(id): Center (\(Int(boxCenterX)), \(Int(boxCenterY))), Distance: \(Int(sqrt(distSq)))")
-            
             if distSq < minDistance {
                 minDistance = distSq
                 bestId = id
@@ -435,7 +406,6 @@ class VisionService {
         }
         
         if let best = bestId {
-            print("[VisionService] ✓ Selected Instance \(best) as main subject")
             return IndexSet(integer: best)
         }
         

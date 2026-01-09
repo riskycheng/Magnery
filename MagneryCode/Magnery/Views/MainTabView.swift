@@ -36,23 +36,14 @@ struct MainTabView: View {
                 HStack(spacing: 0) {
                     HomeView(selectedTab: $selectedTab)
                         .frame(width: proxy.size.width)
-                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
-                            if selectedTab != .home { value = true }
-                        }
                         .allowsHitTesting(selectedTab == .home)
                     
                     CommunityView()
                         .frame(width: proxy.size.width)
-                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
-                            if selectedTab != .community { value = true }
-                        }
                         .allowsHitTesting(selectedTab == .community)
                     
                     PersonalView()
                         .frame(width: proxy.size.width)
-                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
-                            if selectedTab != .personal { value = true }
-                        }
                         .allowsHitTesting(selectedTab == .personal)
                 }
                 .offset(x: -CGFloat(selectedTab.index) * proxy.size.width)
@@ -68,20 +59,35 @@ struct MainTabView: View {
         }
         .background(Color(red: 0.95, green: 0.95, blue: 0.97).ignoresSafeArea())
         .onPreferenceChange(TabBarVisibilityPreferenceKey.self) { visible in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                isTabBarVisible = visible
+            // Only toggle if we are on the Home tab (where ListView/DetailView might hide it).
+            // On other tabs, we default to visible to avoid inactive tabs hiding the bar.
+            let targetVisible = (selectedTab == .home) ? visible : true
+            
+            if isTabBarVisible != targetVisible {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isTabBarVisible = targetVisible
+                }
+            }
+        }
+        .onChange(of: selectedTab) { newValue in
+            // Reset visibility when switching tabs
+            if newValue != .home && !isTabBarVisible {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isTabBarVisible = true
+                }
             }
         }
     }
     
     private var floatingTabBar: some View {
         GeometryReader { geometry in
-            let barWidth = geometry.size.width - 60
+            let barWidth = max(0, geometry.size.width - 60)
             let barHeight: CGFloat = 72
-            let tabWidth = barWidth / CGFloat(Tab.allCases.count)
+            let tabWidth = max(1, barWidth / CGFloat(Tab.allCases.count))
             
-            ZStack(alignment: .leading) {
-                // Background Capsule
+            if barWidth > 0 {
+                ZStack(alignment: .leading) {
+                    // Background Capsule
                 Capsule()
                     .fill(Color.white.opacity(0.98))
                     .shadow(color: .black.opacity(0.08), radius: 15, x: 0, y: 8)
@@ -169,6 +175,7 @@ struct MainTabView: View {
                         impact.impactOccurred()
                     }
             )
+            }
         }
         .frame(height: 80)
         .padding(.horizontal, 30)
