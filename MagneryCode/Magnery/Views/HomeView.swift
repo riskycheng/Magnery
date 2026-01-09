@@ -27,6 +27,10 @@ struct HomeView: View {
     @State private var bgRippleLocation: CGPoint = .zero
     @State private var bgRippleScale: CGFloat = 1.0
     @State private var bgRippleOpacity: Double = 0.0
+    @State private var groupingDragOffset: CGFloat = 0
+    @State private var isDraggingGrouping = false
+    @State private var modeDragOffset: CGFloat = 0
+    @State private var isDraggingMode = false
     
     private let collapsedThreshold: CGFloat = 200
     private let maxHeaderHeight: CGFloat = 360
@@ -380,29 +384,37 @@ struct HomeView: View {
             if store.sections.isEmpty {
                 emptyStateView
             } else {
-                LazyVStack(alignment: .leading, spacing: 40) {
-                    ForEach(store.sections) { sectionData in
-                        VStack(alignment: .leading, spacing: 24) {
-                            if !sectionData.section.isEmpty {
-                                Text(AttributedString(sectionData.section, attributes: AttributeContainer([
-                                    .font: Font.system(size: 12, weight: .bold, design: .monospaced),
-                                    .tracking: 3.0
-                                ])))
-                                .foregroundColor(.secondary.opacity(0.5))
-                                .padding(.horizontal, 32)
-                            }
-                            
-                            ForEach(sectionData.groups) { group in
-                                NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
-                                    GroupCard(group: group, groupingMode: store.groupingMode)
+                ZStack(alignment: .top) {
+                    LazyVStack(alignment: .leading, spacing: 40) {
+                        ForEach(store.sections) { sectionData in
+                            VStack(alignment: .leading, spacing: 24) {
+                                if !sectionData.section.isEmpty {
+                                    Text(AttributedString(sectionData.section, attributes: AttributeContainer([
+                                        .font: Font.system(size: 12, weight: .bold, design: .monospaced),
+                                        .tracking: 3.0
+                                    ])))
+                                    .foregroundColor(.secondary.opacity(0.5))
+                                    .padding(.horizontal, 32)
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal, 24)
+                                
+                                ForEach(sectionData.groups) { group in
+                                    NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
+                                        GroupCard(group: group, groupingMode: store.groupingMode)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .padding(.horizontal, 24)
+                                }
                             }
                         }
                     }
+                    .id(store.groupingMode)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .opacity
+                    ))
                 }
                 .padding(.top, 20)
+                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: store.groupingMode)
             }
         }
         .padding(.bottom, 160)
@@ -527,6 +539,7 @@ struct HomeView: View {
         .frame(height: 40)
         .contentShape(Rectangle())
         .onTapGesture {
+            guard homeMode != mode else { return }
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred()
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -538,17 +551,27 @@ struct HomeView: View {
     private var modeSelectionIndicator: some View {
         GeometryReader { geo in
             let width = geo.size.width / 2
+            let baseOffset = homeMode == .camera ? 2.0 : width + 2.0
+            let finalOffset = isDraggingMode ? 
+                min(max(2, modeDragOffset - (width/2)), width*2 - width + 2) : 
+                baseOffset
+                
             Capsule()
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
                 .frame(width: width - 4)
-                .offset(x: homeMode == .camera ? 2 : width + 2)
+                .offset(x: finalOffset)
         }
     }
 
     private var modeDragGesture: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
+                if !isDraggingMode {
+                    isDraggingMode = true
+                }
+                modeDragOffset = value.location.x
+                
                 let midPoint = 70.0 // Half of 140
                 if value.location.x < midPoint && homeMode == .map {
                     let impact = UIImpactFeedbackGenerator(style: .medium)
@@ -562,6 +585,11 @@ struct HomeView: View {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         homeMode = .map
                     }
+                }
+            }
+            .onEnded { _ in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isDraggingMode = false
                 }
             }
     }
@@ -603,6 +631,7 @@ struct HomeView: View {
         .frame(height: 40)
         .contentShape(Rectangle())
         .onTapGesture {
+            guard store.groupingMode != mode else { return }
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred()
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -614,17 +643,27 @@ struct HomeView: View {
     private var groupingSelectionIndicator: some View {
         GeometryReader { geo in
             let width = geo.size.width / 2
+            let baseOffset = store.groupingMode == .location ? 2.0 : width + 2.0
+            let finalOffset = isDraggingGrouping ? 
+                min(max(2, groupingDragOffset - (width/2)), width*2 - width + 2) : 
+                baseOffset
+            
             Capsule()
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
                 .frame(width: width - 4)
-                .offset(x: store.groupingMode == .location ? 2 : width + 2)
+                .offset(x: finalOffset)
         }
     }
 
     private var groupingDragGesture: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
+                if !isDraggingGrouping {
+                    isDraggingGrouping = true
+                }
+                groupingDragOffset = value.location.x
+                
                 let midPoint = 70.0 // Half of 140
                 if value.location.x < midPoint && store.groupingMode == .time {
                     let impact = UIImpactFeedbackGenerator(style: .medium)
@@ -638,6 +677,11 @@ struct HomeView: View {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                         store.setGroupingMode(.time)
                     }
+                }
+            }
+            .onEnded { _ in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    isDraggingGrouping = false
                 }
             }
     }

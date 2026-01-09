@@ -3,10 +3,14 @@ import SwiftUI
 import Combine
 import CoreLocation
 
-struct SectionData: Identifiable {
-    let id = UUID()
+struct SectionData: Identifiable, Equatable {
+    var id: String { section }
     let section: String
     let groups: [MagnetGroup]
+    
+    static func == (lhs: SectionData, rhs: SectionData) -> Bool {
+        lhs.section == rhs.section && lhs.groups == rhs.groups
+    }
 }
 
 @MainActor
