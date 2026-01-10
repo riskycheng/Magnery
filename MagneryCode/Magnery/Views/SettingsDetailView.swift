@@ -124,7 +124,7 @@ struct SettingsDetailView: View {
     }
     
     private var termsOfServiceContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("服务条款")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -133,23 +133,45 @@ struct SettingsDetailView: View {
                     .foregroundColor(.secondary)
             }
             
-            Text("欢迎使用 Magnery。使用本应用即表示您同意以下协议条款。请务必仔细阅读。")
+            Text("欢迎使用 Magnery。本协议是您与 Magnery 团队（“我们”）之间就使用本应用服务所订立的法律协议。使用本应用即表示您已阅读并同意本条款。")
                 .foregroundColor(.secondary)
             
-            VStack(alignment: .leading, spacing: 24) {
-                TOSSection(title: "1. 服务协议的确认", content: "本协议是您与 Magnery 团队之间关于下载、安装、使用本移动应用所订立的协议。")
+            VStack(alignment: .leading, spacing: 16) {
+                TOSBlock(title: "1. 服务的性质", icon: "sparkles.rectangle.stack") {
+                    Text("Magnery 提供基于 AI 的冰箱贴管理、识别及 3D 重建服务。我们致力于不断改进技术，但可能随时根据产品策略调整功能模块。")
+                }
                 
-                TOSSection(title: "2. 账号与安全", content: "您无需注册账号即可使用核心功能。您的昵称、头像及收藏数据均保存在本地或您的 iCloud 私有空间中。")
+                TOSBlock(title: "2. 用户账号与数据", icon: "person.text.rectangle") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("• 您无需注册即可使用。您的数据托管于本地及您的 iCloud 私人存储。")
+                        Text("• 您应妥善保管设备及个人备份信息，我们不对因用户个人失误导致的数据丢失负责。")
+                    }
+                }
                 
-                TOSSection(title: "3. 用户行为规范", content: "您承诺在使用本应用生成的 3D 模型或 AI 内容时，遵守当地法律法规，不传播违法或侵权信息。")
+                TOSBlock(title: "3. 知识产权声明", icon: "c.circle") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("• **我们的权利**：Magnery 品牌、源代码、UI 设计及内置 AI 算法模型均受知识产权法保护。")
+                        Text("• **您的权利**：您拍摄的照片及通过 App 生成的独创性数字资源（如 3D 模型）的所有权归您所有。")
+                    }
+                }
                 
-                TOSSection(title: "4. AI 服务免责", content: "应用提供的 AI 识别、3D 模型转换及科普知识由第三方技术支持，结果受模型限制可能存在误差。相关内容仅供参考，不构成专业建议。")
+                TOSBlock(title: "4. 使用规范与合规", icon: "hand.raised.fill") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("您理解并同意，在使用本服务时将遵守法律法规，不得利用本应用制作或存储任何具有误导性、侵权性或危害性的数字内容。")
+                    }
+                }
                 
-                TOSSection(title: "5. 知识产权", content: "Magnery 及其所有原始素材版权归开发团队所有。用户通过 App 拍摄并处理生成的模型，在遵守法律的前提下，其数字资产所有权归用户。")
+                TOSBlock(title: "5. 免责声明", icon: "exclamationmark.shield") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("• **AI 的局限性**：AI 生成的科普信息与 3D 转换结果仅供参考，我们不保证其 100% 的准确性。")
+                        Text("• **第三方服务**：服务中集成了 SiliconFlow 与腾讯云等服务提供商，其稳定性受相应服务商 SLA 影响。")
+                    }
+                }
                 
-                TOSSection(title: "6. 协议更新", content: "我们可能会适时更新本条款。更新后如果您继续使用，即视为接受新条款。")
+                TOSBlock(title: "6. 协议的变更", icon: "arrow.up.doc") {
+                    Text("我们保留在必要时修改本协议的权利。修改后的协议将通过应用更新或公告形式告知。继续使用即视为接受。")
+                }
             }
-            .padding(.top, 10)
         }
     }
     
@@ -251,6 +273,43 @@ struct BulletPoint: View {
     }
 }
 
+struct TOSBlock<Content: View>: View {
+    let title: String
+    let icon: String
+    let content: Content
+    
+    init(title: String, icon: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundColor(.blue)
+                    .font(.system(size: 18))
+                    .frame(width: 24)
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            
+            content
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+                .lineSpacing(4)
+                .padding(.leading, 36)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.02), radius: 8, x: 0, y: 4)
+    }
+}
+
 struct TOSSection: View {
     let title: String
     let content: String
@@ -327,6 +386,7 @@ struct PolicySection<Content: View>: View {
                 .padding(.leading, 24)
         }
         .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.02), radius: 8, x: 0, y: 4)
