@@ -24,50 +24,132 @@ struct SettingsDetailView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .setTabBarVisibility(false)
     }
     
     private var privacyPolicyContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("隐私政策")
-                .font(.title2)
-                .bold()
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("隐私政策")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                
+                Text("更新日期：2026年1月10日")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
-            Text("Magnery 非常重视您的隐私。我们致力于保护您的个人信息并透明地说明我们的数据处理方式。")
+            Text("Magnery (“我们”) 非常重视您的个人隐私保护。本政策旨在说明我们如何处理您的数据，确保您在使用我们的服务时感到安心。")
+                .foregroundColor(.secondary)
             
-            GroupBox(label: Label("数据收集", systemImage: "info.circle")) {
-                Text("我们不会收集、存储或分享您的任何个人数据、照片或位置信息。所有的图片处理和识别均在您的设备本地完成。")
+            VStack(alignment: .leading, spacing: 16) {
+                PolicySection(title: "1. 核心原则", icon: "shield.fill", color: .green) {
+                    Text("我们坚持“隐私先行”的设计理念。除非服务必需，我们不会请求、收集或存储任何超出功能范围外的个人信息。")
+                }
+                
+                PolicySection(title: "2. 数据收集与处理", icon: "lock.doc.fill", color: .blue) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("• 图像与多媒体数据")
+                            .fontWeight(.semibold)
+                        Text("您拍摄或上传的所有冰箱贴照片、GIF 及视频均**仅存储在您的设备本地**。核心的识别与分割算法（Vision SDK）均在本地运行，不会上传至我们的服务器。")
+                        
+                        Text("• 位置信息")
+                            .fontWeight(.semibold)
+                        Text("本应用申请的位置权限仅用于记录冰箱贴的地理标签（如：在上海购买）。此数据存储在设备本地数据库中，不会对外分享。")
+                    }
+                }
+                
+                PolicySection(title: "3. 第三方 AI 协作说明", icon: "sparkles", color: .purple) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("为了实现先进的 AI 标注及 3D 模型生成，我们会与以下服务商协作：")
+                        
+                        // Provider Table Header
+                        HStack {
+                            Text("服务商").frame(width: 100, alignment: .leading)
+                            Text("处理内容").frame(maxWidth: .infinity, alignment: .leading)
+                            Text("链接").frame(width: 60, alignment: .trailing)
+                        }
+                        .font(.caption.bold())
+                        .foregroundColor(.primary)
+                        
+                        Divider()
+                        
+                        // Row 1: SiliconFlow
+                        ProviderRow(name: "SiliconFlow", content: "AI 科普文字生成及语音合成", url: "https://siliconflow.cn")
+                        Divider()
+                        
+                        // Row 2: Tencent Hunyuan
+                        ProviderRow(name: "腾讯混元", content: "2D 图像生成 3D 模型引擎", url: "https://hunyuan.tencent.com")
+                        Divider()
+                        
+                        // Row 3: Tencent COS
+                        ProviderRow(name: "腾讯云 COS", content: "社区数据存储与分发", url: "https://cloud.tencent.com")
+                        
+                        Text("所有远程调用均通过加密通道传输，且服务商不得将此类数据用于训练或非服务用途。")
+                            .font(.system(size: 12))
+                            .italic()
+                    }
+                }
+                
+                PolicySection(title: "4. 数据存储与安全", icon: "server.rack", color: .orange) {
+                    Text("您的收藏数据和个人配置均保存在系统的私有目录中。我们采用系统级的沙盒保护机制，防止第三方应用非法获取数据。")
+                }
+                
+                PolicySection(title: "5. 您的权利", icon: "hand.tap.fill", color: .indigo) {
+                    Text("您可以随时在设置中清理应用缓存或清空收藏库。一旦删除，相关本地数据将无法恢复。")
+                }
+                
+                PolicySection(title: "6. 联系与支持", icon: "envelope.badge.fill", color: .pink) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("如果您对隐私政策、数据处理或应用使用有任何疑问，请随时联系我们：")
+                        Link("riskycheng@gmail.com", destination: URL(string: "mailto:riskycheng@gmail.com")!)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            
+            VStack(alignment: .center, spacing: 12) {
+                Text("如果您对本政策有任何疑问，请通过“意见反馈”与我们交流。")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                
+                Text("Magnery 团队敬上")
+                    .font(.headline)
                     .padding(.top, 4)
             }
-            
-            GroupBox(label: Label("第三方服务", systemImage: "network")) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("为了提供先进的 AI 功能，我们采用了以下服务：")
-                    BulletPoint(text: "SiliconFlow AI API：用于生成科普内容和对话。")
-                    BulletPoint(text: "SiliconFlow TTS：用于语音播报服务。")
-                    Text("在调用这些接口时，我们仅传输必要的内容（如文本或经过处理的图片特征），且不会关联您的个人身份信息。")
-                }
-                .padding(.top, 4)
-            }
-            
-            Text("如果您对我们的隐私政策有任何疑问，请通过意见反馈与我们联系。")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 20)
         }
     }
     
     private var termsOfServiceContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("服务条款")
-                .font(.title2)
-                .bold()
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("服务条款")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                Text("生效日期：2026年1月10日")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
-            SectionView(title: "1. 服务说明", content: "Magnery 提供基于 AI 的冰箱贴识别、收藏管理、3D 模型生成及科普对话服务。")
+            Text("欢迎使用 Magnery。使用本应用即表示您同意以下协议条款。请务必仔细阅读。")
+                .foregroundColor(.secondary)
             
-            SectionView(title: "2. 免责声明", content: "AI 生成的内容（包括科普知识和对话回复）仅供参考，不代表绝对的准确性。用户应对其使用行为负责。")
-            
-            SectionView(title: "3. 隐私保护", content: "我们严格遵守隐私政策，保护用户数据安全。详情请参阅隐私政策页面。")
-            
-            SectionView(title: "4. 知识产权", content: "Magnery 应用及其包含的所有原创内容、设计和算法均受版权法保护。用户生成的创意内容归用户所有。")
+            VStack(alignment: .leading, spacing: 24) {
+                TOSSection(title: "1. 服务协议的确认", content: "本协议是您与 Magnery 团队之间关于下载、安装、使用本移动应用所订立的协议。")
+                
+                TOSSection(title: "2. 账号与安全", content: "您无需注册账号即可使用核心功能。您的昵称、头像及收藏数据均保存在本地或您的 iCloud 私有空间中。")
+                
+                TOSSection(title: "3. 用户行为规范", content: "您承诺在使用本应用生成的 3D 模型或 AI 内容时，遵守当地法律法规，不传播违法或侵权信息。")
+                
+                TOSSection(title: "4. AI 服务免责", content: "应用提供的 AI 识别、3D 模型转换及科普知识由第三方技术支持，结果受模型限制可能存在误差。相关内容仅供参考，不构成专业建议。")
+                
+                TOSSection(title: "5. 知识产权", content: "Magnery 及其所有原始素材版权归开发团队所有。用户通过 App 拍摄并处理生成的模型，在遵守法律的前提下，其数字资产所有权归用户。")
+                
+                TOSSection(title: "6. 协议更新", content: "我们可能会适时更新本条款。更新后如果您继续使用，即视为接受新条款。")
+            }
+            .padding(.top, 10)
         }
     }
     
@@ -88,24 +170,49 @@ struct SettingsDetailView: View {
     }
     
     private var aboutMagneryContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("关于 Magnery")
-                .font(.title2)
-                .bold()
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .center, spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color.white)
+                        .frame(width: 100, height: 100)
+                        .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
+                    
+                    Image(systemName: "square.grid.2x2.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(
+                            LinearGradient(colors: [.orange, .red], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                }
+                
+                VStack(spacing: 4) {
+                    Text("Magnery")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                    Text("Version 1.0.0 (2026)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
             
-            Text("什么是 Magnery？")
-                .font(.headline)
-            Text("Magnery 是一款专为收藏爱好者设计的创意工具。用户可以通过拍摄、加载图片或视频等方式，设计自己喜爱的虚拟冰箱贴，也可以用于记录精致的手办收藏。")
-            
-            Text("核心功能")
-                .font(.headline)
-                .padding(.top, 8)
-            
-            VStack(alignment: .leading, spacing: 10) {
-                FeatureRow(icon: "photo.on.rectangle", text: "支持图片、视频及 GIF 动效展示")
-                FeatureRow(icon: "cube.fill", text: "2D 图片一键生成 3D 模型")
-                FeatureRow(icon: "tag.fill", text: "AI 自动标注与分类管理")
-                FeatureRow(icon: "book.fill", text: "AI 深度知识科普与互动对话")
+            VStack(alignment: .leading, spacing: 20) {
+                AboutSection(title: "什么是 Magnery？") {
+                    Text("Magnery 是一款专为冰箱贴及小比例模型收藏家打造的数字化管理平台。我们利用尖端的 Vision AI 与 3D 重建技术，将您的实物收藏转化为生动的数字资产。")
+                }
+                
+                AboutSection(title: "核心亮点") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        FeatureRow(icon: "camera.viewfinder", text: "全自动 AI 分割与物体识别", color: .blue)
+                        FeatureRow(icon: "cube.transparent.fill", text: "2D 到 3D 快速建模重建", color: .purple)
+                        FeatureRow(icon: "sparkles.rectangle.stack", text: "多维度分类与地理标签管理", color: .orange)
+                        FeatureRow(icon: "brain.headset", text: "智能科普对话与知识拓展", color: .green)
+                    }
+                }
+                
+                AboutSection(title: "我们的愿景") {
+                    Text("连接现实与数字世界，让每一份珍贵的收藏都能在数字空间中永久珍藏、自由展示与分享。")
+                }
             }
         }
     }
@@ -138,7 +245,24 @@ struct BulletPoint: View {
         HStack(alignment: .top, spacing: 8) {
             Text("•")
                 .bold()
+                .foregroundColor(.orange)
             Text(text)
+        }
+    }
+}
+
+struct TOSSection: View {
+    let title: String
+    let content: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.primary)
+            Text(content)
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+                .lineSpacing(4)
         }
     }
 }
@@ -172,19 +296,111 @@ struct FAQItem: View {
     }
 }
 
-struct FeatureRow: View {
+struct PolicySection<Content: View>: View {
+    let title: String
     let icon: String
-    let text: String
+    let color: Color
+    let content: Content
+    
+    init(title: String, icon: String, color: Color, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.content = content()
+    }
+    
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(.blue)
-                .frame(width: 24)
-            Text(text)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .font(.system(size: 16, weight: .bold))
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            
+            content
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+                .lineSpacing(4)
+                .padding(.leading, 24)
+        }
+        .padding(16)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.02), radius: 8, x: 0, y: 4)
+    }
+}
+
+struct AboutSection<Content: View>: View {
+    let title: String
+    let content: Content
+    
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.primary)
+            
+            content
+                .font(.system(size: 15))
+                .foregroundColor(.secondary)
+                .lineSpacing(4)
         }
     }
 }
 
+struct FeatureRow: View {
+    let icon: String
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.1))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .font(.system(size: 14, weight: .bold))
+            }
+            Text(text)
+                .font(.system(size: 15))
+                .foregroundColor(.primary)
+        }
+    }
+}
+struct ProviderRow: View {
+    let name: String
+    let content: String
+    let url: String
+    
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(name)
+                .frame(width: 100, alignment: .leading)
+                .font(.system(size: 14, weight: .bold))
+            
+            Text(content)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+            
+            Link(destination: URL(string: url)!) {
+                Image(systemName: "arrow.up.right.circle.fill")
+                    .foregroundColor(.blue.opacity(0.8))
+            }
+            .frame(width: 60, alignment: .trailing)
+        }
+    }
+}
 #Preview {
     NavigationStack {
         SettingsDetailView(title: "关于 Magnery")

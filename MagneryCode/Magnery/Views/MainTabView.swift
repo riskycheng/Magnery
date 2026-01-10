@@ -59,9 +59,8 @@ struct MainTabView: View {
         }
         .background(Color(red: 0.95, green: 0.95, blue: 0.97).ignoresSafeArea())
         .onPreferenceChange(TabBarVisibilityPreferenceKey.self) { visible in
-            // Only toggle if we are on the Home tab (where ListView/DetailView might hide it).
-            // On other tabs, we default to visible to avoid inactive tabs hiding the bar.
-            let targetVisible = (selectedTab == .home) ? visible : true
+            // Respect the visibility preference across all tabs
+            let targetVisible = visible
             
             if isTabBarVisible != targetVisible {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -69,9 +68,9 @@ struct MainTabView: View {
                 }
             }
         }
-        .onChange(of: selectedTab) { newValue in
-            // Reset visibility when switching tabs
-            if newValue != .home && !isTabBarVisible {
+        .onChange(of: selectedTab) { _ in
+            // Reset visibility when switching tabs to ensure the bar is available on the new tab
+            if !isTabBarVisible {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isTabBarVisible = true
                 }
