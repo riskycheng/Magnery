@@ -139,7 +139,6 @@ struct HomeView: View {
                             .foregroundColor(.primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .opacity(Double(progress > 0.5 ? (progress - 0.5) * 2 : 0))
-                            .offset(x: (1.0 - progress) * 20)
                         
                         // Docked Title (Center)
                         Text("收藏家")
@@ -147,7 +146,6 @@ struct HomeView: View {
                             .foregroundColor(.primary)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .opacity(Double(progress < 0.5 ? (0.5 - progress) * 2 : 0))
-                            .offset(x: progress * -20)
                     }
                     
                     ZStack {
@@ -180,30 +178,31 @@ struct HomeView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                
-                if isDocked {
-                    Button(action: { 
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        showingCamera = true 
-                    }) {
-                        ZStack {
-                            Image(systemName: "viewfinder")
-                                .font(Font.system(size: 16, weight: .medium))
-                                .foregroundColor(.primary)
-                            
-                            Circle()
-                                .fill(.primary)
-                                .frame(width: 4, height: 4)
+                .overlay(alignment: .trailing) {
+                    if isDocked {
+                        Button(action: { 
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            showingCamera = true 
+                        }) {
+                            ZStack {
+                                Image(systemName: "viewfinder")
+                                    .font(Font.system(size: 16, weight: .medium))
+                                    .foregroundColor(.primary)
+                                
+                                Circle()
+                                    .fill(Color(red: 0.1, green: 0.75, blue: 0.5))
+                                    .frame(width: 4, height: 4)
+                            }
+                            .frame(width: 36, height: 36)
+                            .background(
+                                Circle()
+                                    .fill(.white)
+                                    .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
+                            )
                         }
-                        .frame(width: 36, height: 36)
-                        .background(
-                            Circle()
-                                .fill(.white)
-                                .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-                        )
+                        .transition(.scale.combined(with: .opacity))
                     }
-                    .transition(.scale.combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 28)
@@ -344,7 +343,7 @@ struct HomeView: View {
                             .scaleEffect(1.0 + Double(dotScale - 1.0) * 2.0)
                         
                         Circle()
-                            .fill(.black)
+                            .fill(Color(red: 0.1, green: 0.75, blue: 0.5))
                             .frame(width: 8, height: 8)
                             .opacity(pulseOpacity > 0.2 ? 1 : 0.5)
                     }
