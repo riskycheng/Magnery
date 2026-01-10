@@ -176,18 +176,46 @@ struct SettingsDetailView: View {
     }
     
     private var faqContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("常见问题")
-                .font(.title2)
-                .bold()
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("常见问题")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                Text("帮助您更好地了解与使用 Magnery")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
             
-            FAQItem(question: "物体识别算法是如何工作的？", answer: "我们采用了 iOS 原生的 Vision SDK 进行高效的本地图像分析和特征提取。")
-            
-            FAQItem(question: "自动标注的大语言模型来自哪里？", answer: "自动标注和科普内容由硅基流动（SiliconFlow）API 提供的千问（Qwen）系列大模型服务支持。")
-            
-            FAQItem(question: "3D 模型是如何生成的？", answer: "我们采用腾讯混元 3D（Hunyuan3D）的服务，将您拍摄并分割好的 2D 图片转化为对应的 3D 模型。")
-            
-            FAQItem(question: "我的隐私和数据安全吗？", answer: "非常安全。核心识别算法在本地运行。远程 AI 调用均经过加密传输，且我们不会在服务器端缓存或收集任何用户数据。")
+            VStack(spacing: 16) {
+                FAQBlock(
+                    question: "物体识别与抠图是如何实现的？",
+                    answer: "我们采用了 iOS 原生的 Vision SDK 与 Core ML 技术。所有的抠图与边缘识别均在您的 iPhone 本地实时完成，不依赖网络，且能最大程度保护您的照片隐私。"
+                )
+                
+                FAQBlock(
+                    question: "AI 生成的科普内容是否准确？",
+                    answer: "科普内容由硅基流动提供的 Qwen 系列大模型生成。虽然 AI 具有极高的准确率，但仍可能存在“幻觉”现象。相关地理与文化知识仅供参考，建议在专业场合进行二次核实。"
+                )
+                
+                FAQBlock(
+                    question: "3D 模型生成的流程是怎样的？",
+                    answer: "当您为冰箱贴发起 3D 转换时，我们会将处理后的透明图片特征发送至腾讯混元 3D 引擎。生成的 USDZ 模型会自动同步回您的本地库中，您可以随时使用 AR 模式查看。"
+                )
+                
+                FAQBlock(
+                    question: "为什么有些物体识别不出来？",
+                    answer: "识别效果受光照、拍摄角度以及物体复杂度的影响。建议在光线充足的环境下，从正面垂直角度拍摄识别目标，以获得最佳的分割效果。"
+                )
+                
+                FAQBlock(
+                    question: "我的数据会同步到云端吗？",
+                    answer: "Magnery 默认将数据存储在您的设备本地。如果您开启了系统的 iCloud 云存储功能，您的收藏数据会自动在您的 Apple 设备间同步。我们不建立独立的账号体系，以保证数据的绝对隐私。"
+                )
+                
+                FAQBlock(
+                    question: "我想反馈问题或建议，该怎么做？",
+                    answer: "非常欢迎您的反馈！您可以通过“个人中心-意见反馈”直接发送邮件，或联系我们的支持邮箱：riskycheng@gmail.com。我们会认真阅读每一封来信。"
+                )
+            }
         }
     }
     
@@ -352,6 +380,67 @@ struct FAQItem: View {
                 .foregroundColor(.secondary)
             Divider()
         }
+    }
+}
+
+struct FAQBlock: View {
+    let question: String
+    let answer: String
+    @State private var isExpanded: Bool = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 12) {
+                    Text("Q:")
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundColor(.orange)
+                    
+                    Text(question)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.leading)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.gray.opacity(0.3))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                        .padding(.horizontal, 16)
+                    
+                    HStack(alignment: .top, spacing: 12) {
+                        Text("A:")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundColor(.blue)
+                        
+                        Text(answer)
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                            .lineSpacing(6)
+                    }
+                    .padding(16)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.02), radius: 8, x: 0, y: 4)
     }
 }
 
