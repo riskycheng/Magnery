@@ -220,49 +220,98 @@ struct SettingsDetailView: View {
     }
     
     private var aboutMagneryContent: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 28) {
+            // App Identity Header
             VStack(alignment: .center, spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(Color.white)
-                        .frame(width: 100, height: 100)
-                        .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
-                    
-                    Image(systemName: "square.grid.2x2.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(
-                            LinearGradient(colors: [.orange, .red], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                }
+                Image("AppLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 84, height: 84)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: 6)
                 
-                VStack(spacing: 4) {
+                VStack(spacing: 6) {
                     Text("Magnery")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                    Text("Version 1.0.0 (2026)")
-                        .font(.caption)
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                    
+                    Text("记录每一份收藏的温度")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .italic()
+                        
+                    HStack(spacing: 8) {
+                        Text("Version 1.0.0")
+                        Text("•")
+                        Text("Build 20260111")
+                    }
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(.secondary.opacity(0.7))
+                    .padding(.top, 4)
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
+            .padding(.vertical, 10)
             
-            VStack(alignment: .leading, spacing: 20) {
-                AboutSection(title: "什么是 Magnery？") {
-                    Text("Magnery 是一款专为冰箱贴及小比例模型收藏家打造的数字化管理平台。我们利用尖端的 Vision AI 与 3D 重建技术，将您的实物收藏转化为生动的数字资产。")
+            VStack(alignment: .leading, spacing: 16) {
+                // Section 1: Intro
+                AboutCard(title: "什么是 Magnery？", icon: "questionmark.circle.fill", color: .blue) {
+                    Text("Magnery 是一款专为冰箱贴及小比例模型收藏家打造的数字化管理工具。我们利用尖端的 Vision AI 与 3D 重建技术，将您的实物收藏转化为生动的数字资产，让回忆在云端永存。")
                 }
                 
-                AboutSection(title: "核心亮点") {
-                    VStack(alignment: .leading, spacing: 12) {
+                // Section 2: Features
+                AboutCard(title: "核心亮点", icon: "star.fill", color: .orange) {
+                    VStack(alignment: .leading, spacing: 14) {
                         FeatureRow(icon: "camera.viewfinder", text: "全自动 AI 分割与物体识别", color: .blue)
-                        FeatureRow(icon: "cube.transparent.fill", text: "2D 到 3D 快速建模重建", color: .purple)
-                        FeatureRow(icon: "sparkles.rectangle.stack", text: "多维度分类与地理标签管理", color: .orange)
-                        FeatureRow(icon: "brain.headset", text: "智能科普对话与知识拓展", color: .green)
+                        FeatureRow(icon: "cube.transparent.fill", text: "2D 到 3D 快速建模与 AR 展示", color: .purple)
+                        FeatureRow(icon: "sparkles.rectangle.stack", text: "多维度分类与地理标签轨迹", color: .orange)
+                        FeatureRow(icon: "brain.headset", text: "智能科普对话与情感化互动", color: .green)
+                    }
+                    .padding(.top, 4)
+                }
+                
+                // Section 3: Tech Stack
+                AboutCard(title: "技术驱动", icon: "cpu.fill", color: .red) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Magnery 集成了业界领先的技术方案：")
+                        Text("• **Vision SDK**: 实现毫秒级的端侧抠图与识别。")
+                        Text("• **Hunyuan3D**: 腾讯混元大模型驱动的 3D 重建。")
+                        Text("• **SiliconFlow**: 强大的 LLM 知识库与播报支持。")
                     }
                 }
                 
-                AboutSection(title: "我们的愿景") {
-                    Text("连接现实与数字世界，让每一份珍贵的收藏都能在数字空间中永久珍藏、自由展示与分享。")
+                // Section 4: Vision
+                AboutCard(title: "我们的愿景", icon: "eye.fill", color: .purple) {
+                    Text("连接现实与数字，赋予实物以灵魂。每一枚冰箱贴都承载着一段旅程。在 Magnery，我们不仅记录收藏，更在编织您跨越山海的人生印记。")
                 }
+                
+                // Section 5: Community & Feedback
+                AboutCard(title: "加入我们", icon: "person.2.fill", color: .indigo) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("如果您有任何创意想法，或想探索更多冰箱贴背后的故事，欢迎加入我们的社区。")
+                        HStack(spacing: 20) {
+                            Link(destination: URL(string: "mailto:riskycheng@gmail.com")!) {
+                                Label("反馈建议", systemImage: "envelope.fill")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                        }
+                    }
+                }
+                
+                // Bottom Links / Footer
+                VStack(spacing: 12) {
+                    Divider()
+                        .padding(.vertical, 8)
+                        
+                    Text("Made with ❤️ for Collectors")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary.opacity(0.6))
+                        
+                    Text("© 2026 Magnery Team. All Rights Reserved.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary.opacity(0.4))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 10)
             }
         }
     }
@@ -444,6 +493,44 @@ struct FAQBlock: View {
     }
 }
 
+struct AboutCard<Content: View>: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let content: Content
+    
+    init(title: String, icon: String, color: Color, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .font(.system(size: 16, weight: .bold))
+                
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            
+            content
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+                .lineSpacing(6)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .cornerRadius(18)
+        .shadow(color: .black.opacity(0.025), radius: 10, x: 0, y: 5)
+    }
+}
+
 struct PolicySection<Content: View>: View {
     let title: String
     let icon: String
@@ -482,50 +569,28 @@ struct PolicySection<Content: View>: View {
     }
 }
 
-struct AboutSection<Content: View>: View {
-    let title: String
-    let content: Content
-    
-    init(title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
-            
-            content
-                .font(.system(size: 15))
-                .foregroundColor(.secondary)
-                .lineSpacing(4)
-        }
-    }
-}
-
 struct FeatureRow: View {
     let icon: String
     let text: String
     let color: Color
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(color.opacity(0.1))
+                    .fill(color.opacity(0.12))
                     .frame(width: 32, height: 32)
                 Image(systemName: icon)
                     .foregroundColor(color)
                     .font(.system(size: 14, weight: .bold))
             }
             Text(text)
-                .font(.system(size: 15))
-                .foregroundColor(.primary)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.primary.opacity(0.85))
         }
     }
 }
+
 struct ProviderRow: View {
     let name: String
     let content: String
