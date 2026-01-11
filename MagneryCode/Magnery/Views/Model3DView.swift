@@ -14,26 +14,8 @@ struct Model3DView: View {
     var body: some View {
         ZStack {
             if let scene = scene {
-                ZStack(alignment: .bottomLeading) {
-                    TransparentSceneView(scene: scene, cameraNode: cameraNode)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    
-                    // 3D Interaction Indicator
-                    HStack(spacing: 6) {
-                        Image(systemName: "move.3d")
-                        Text("3D 可旋转")
-                    }
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.7))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.black.opacity(0.2))
-                            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
-                    )
-                    .padding(20)
-                }
+                TransparentSceneView(scene: scene, cameraNode: cameraNode)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if isLoading {
                 VStack(spacing: 12) {
                     ZStack {

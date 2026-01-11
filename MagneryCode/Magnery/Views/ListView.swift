@@ -311,6 +311,27 @@ struct MagnetCard: View {
                                 .foregroundColor(.gray)
                         )
                 }
+                
+                // 3D Indicator
+                if magnet.modelPath != nil {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(LinearGradient(gradient: Gradient(colors: [.purple, .indigo]), startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 28, height: 28)
+                                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                                
+                                Image(systemName: "cube.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(6)
+                        }
+                        Spacer()
+                    }
+                }
             }
             
             Text(magnet.name)

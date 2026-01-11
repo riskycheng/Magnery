@@ -30,6 +30,13 @@ struct DetailView: View {
     @State private var statusMessage: String = ""
     @State private var showing3DQuotaAlert = false
     
+    // View Mode Toggle
+    enum ViewMode {
+        case twoD
+        case threeD
+    }
+    @State private var viewMode: ViewMode = .threeD
+    
     private var isCommunityMagnet: Bool {
         currentMagnet.imagePath.hasPrefix("http")
     }
@@ -41,6 +48,7 @@ struct DetailView: View {
     init(magnet: MagnetItem) {
         self.magnet = magnet
         _currentMagnet = State(initialValue: magnet)
+        _viewMode = State(initialValue: magnet.modelPath != nil ? .threeD : .twoD)
     }
     
     var body: some View {
@@ -63,18 +71,43 @@ struct DetailView: View {
                 
                 Spacer()
                 
-                if let modelPath = currentMagnet.modelPath {
-                    Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
-                        .id(modelPath)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 380)
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.8).combined(with: .opacity),
-                            removal: .scale(scale: 0.8).combined(with: .opacity)
-                        ))
-                } else if let gifPath = currentMagnet.gifPath {
-                    NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
-                        .id(gifPath)
+                ZStack {
+                    if viewMode == .threeD, let modelPath = currentMagnet.modelPath {
+                        Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
+                            .id(modelPath)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 380)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 0.8).combined(with: .opacity)
+                            ))
+                    } else if let gifPath = currentMagnet.gifPath {
+                        NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
+                            .id(gifPath)
+                            .frame(maxHeight: 380)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.8).combined(with: .opacity),
+                                removal: .scale(scale: 0.8).combined(with: .opacity)
+                            ))
+                            .gesture(
+                                DragGesture(minimumDistance: 30)
+                                    .onEnded { value in
+                                        handleSwipeGesture(translation: value.translation)
+                                    }
+                            )
+                    } else {
+                        // Handle both local and remote images
+                        Group {
+                            if currentMagnet.imagePath.hasPrefix("http") {
+                                CachedAsyncImage(url: currentMagnet.imageURL, fallbackURLs: currentMagnet.imageFallbackURLs)
+                                    .aspectRatio(contentMode: .fit)
+                            } else if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            }
+                        }
+                        .id(currentMagnet.imagePath)
                         .frame(maxHeight: 380)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
@@ -83,34 +116,25 @@ struct DetailView: View {
                         .gesture(
                             DragGesture(minimumDistance: 30)
                                 .onEnded { value in
-                                    handleSwipeGesture(translation: value.translation)
+                                        handleSwipeGesture(translation: value.translation)
                                 }
                         )
-                } else {
-                    // Handle both local and remote images
-                    Group {
-                        if currentMagnet.imagePath.hasPrefix("http") {
-                            CachedAsyncImage(url: currentMagnet.imageURL, fallbackURLs: currentMagnet.imageFallbackURLs)
-                                .aspectRatio(contentMode: .fit)
-                        } else if let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
+                    }
+                    
+                    // View Mode Switcher Overlay
+                    if currentMagnet.modelPath != nil {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                viewModeToggle
+                                    .padding(.trailing, 30)
+                                    .padding(.bottom, 10)
+                            }
                         }
                     }
-                    .id(currentMagnet.imagePath)
-                    .frame(maxHeight: 380)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.8).combined(with: .opacity),
-                        removal: .scale(scale: 0.8).combined(with: .opacity)
-                    ))
-                    .gesture(
-                        DragGesture(minimumDistance: 30)
-                            .onEnded { value in
-                                    handleSwipeGesture(translation: value.translation)
-                            }
-                    )
                 }
+                .frame(height: 380)
                 
                 VStack(spacing: 8) {
                     Text(currentMagnet.name)
@@ -232,6 +256,14 @@ struct DetailView: View {
         }
         .sheet(isPresented: $showingAIDialog) {
             AIDialogView(magnet: $currentMagnet)
+        }
+        .onChange(of: currentMagnet) { oldValue, newValue in
+            // Default to 3D if available when switching items
+            if newValue.modelPath != nil {
+                viewMode = .threeD
+            } else {
+                viewMode = .twoD
+            }
         }
         .onChange(of: showingAIDialog) { oldValue, newValue in
             if !newValue {
@@ -435,6 +467,40 @@ struct DetailView: View {
         }
     }
     
+    private var viewModeToggle: some View {
+        HStack(spacing: 0) {
+            Button(action: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    viewMode = .twoD
+                }
+            }) {
+                Text("2D")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(viewMode == .twoD ? .white : .secondary)
+                    .frame(width: 40, height: 26)
+                    .background(viewMode == .twoD ? Color.blue : Color.clear)
+                    .clipShape(Capsule())
+            }
+            
+            Button(action: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    viewMode = .threeD
+                }
+            }) {
+                Text("3D")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(viewMode == .threeD ? .white : .secondary)
+                    .frame(width: 40, height: 26)
+                    .background(viewMode == .threeD ? Color.purple : Color.clear)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding(3)
+        .background(BlurView(style: .systemUltraThinMaterial))
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+
     private var groupTitle: String {
         if store.groupingMode == .location {
             return currentMagnet.location
