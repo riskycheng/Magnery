@@ -130,15 +130,14 @@ struct HomeView: View {
         let verticalSpacing = 2.0 + (6.0 * progress)
         
         return VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: verticalSpacing) {
-                    // Expanded Title
+            ZStack {
+                // Expanded Content (Centered)
+                VStack(spacing: verticalSpacing) {
                     Text(greeting)
                         .font(Font.system(size: titleSize, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
-                        .opacity(progress > 0.4 ? (progress - 0.4) * 2.5 : 0)
+                        .scaleEffect(progress > 0.4 ? 1.0 : 0.8)
                     
-                    // Expanded Subtitle
                     HStack(spacing: 4) {
                         Text("已收集")
                         Text("\(store.magnets.count)")
@@ -148,36 +147,14 @@ struct HomeView: View {
                     }
                     .font(Font.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundColor(.secondary.opacity(0.8))
-                    .opacity(progress > 0.4 ? (progress - 0.4) * 2.5 : 0)
                 }
-                .padding(.leading, 24)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
+                .opacity(progress > 0.4 ? (progress - 0.4) * 2.5 : 0)
                 
-                Spacer()
-                
-                // Docked Camera Button
-                Button(action: { showingCamera = true }) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 44, height: 44)
-                            .shadow(color: .black.opacity(0.15), radius: 8)
-                        
-                        Circle()
-                            .fill(Color("AppGreen"))
-                            .frame(width: 12, height: 12)
-                    }
-                }
-                .padding(.trailing, 24)
-                .scaleEffect(progress < 0.4 ? 1.0 : 0.8)
-                .opacity(progress < 0.4 ? 1.0 : 0.0)
-                .animation(.spring(), value: progress)
-            }
-            .padding(.top, 60)
-            .padding(.horizontal, 28)
-            .overlay(
-                // Exactly Centered Title & Status (Visible only when docked)
+                // Docked Content (Centered)
                 VStack(spacing: 1) {
-                    Text("Jiancheng")
+                    Text(store.userName)
                         .font(.system(size: 17, weight: .bold, design: .rounded))
                     
                     Text("\(store.magnets.count) Collections")
@@ -185,10 +162,11 @@ struct HomeView: View {
                         .foregroundColor(.secondary)
                 }
                 .opacity(progress < 0.35 ? 1.0 : 0.0)
-                .offset(y: 28) // Calculated for centering with buttons
-            )
-            .overlay(alignment: .trailing) {
-                if isDocked {
+                .offset(y: 5) // Slightly adjust for visual balance
+                
+                // Camera Button (Right Aligned)
+                HStack {
+                    Spacer()
                     Button(action: { 
                         let impact = UIImpactFeedbackGenerator(style: .medium)
                         impact.impactOccurred()
@@ -196,29 +174,25 @@ struct HomeView: View {
                     }) {
                         ZStack {
                             Circle()
-                                .fill(.white)
-                                .frame(width: 38, height: 38)
-                                .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 3)
+                                .fill(isDocked ? .white : .clear)
+                                .frame(width: 40, height: 40)
+                                .shadow(color: .black.opacity(isDocked ? 0.08 : 0), radius: 8)
                             
-                            Circle()
-                                .fill(Color("AppGreen"))
-                                .frame(width: 10, height: 10)
+                            Image(systemName: "camera.viewfinder")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.primary)
                         }
                     }
                     .padding(.trailing, 24)
-                    .transition(.scale.combined(with: .opacity))
                 }
             }
-        }
-        .padding(.top, UIApplication.shared.windows.first?.safeAreaInsets.top ?? 44)
-        .padding(.bottom, 12 + (4.0 * progress))
-        .background(
-            ZStack {
+            .padding(.top, 60)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 15)
+            .background(
+                ZStack {
                     if isDocked {
                         BlurView(style: .systemUltraThinMaterialLight)
-                            .ignoresSafeArea()
-                    } else {
-                        Color(red: 0.95, green: 0.95, blue: 0.97)
                             .ignoresSafeArea()
                     }
                 }
@@ -230,8 +204,9 @@ struct HomeView: View {
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .opacity(isDocked ? 1 : 0)
             )
-            .ignoresSafeArea(edges: .top)
         }
+        .ignoresSafeArea(edges: .top)
+    }
     
     private func handleScroll(_ value: CGFloat) {
         if abs(value - scrollOffset) < scrollUpdateThreshold {

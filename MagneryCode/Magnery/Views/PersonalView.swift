@@ -267,16 +267,25 @@ struct PersonalView: View {
     }
     
     private var statsSection: some View {
-        HStack(spacing: 16) {
-            NavigationLink(destination: ListView()) {
-                statCard(title: "已收藏", value: "\(store.magnets.count)", unit: "个", icon: "square.grid.2x2.fill", color: .orange)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 16) {
+                NavigationLink(destination: ListView()) {
+                    statCard(title: "已收藏", value: "\(store.magnets.count)", unit: "个", icon: "square.grid.2x2.fill", color: .orange)
+                }
+                
+                NavigationLink(destination: MapView()) {
+                    statCard(title: "已点亮", value: "\(uniqueLocationsCount)", unit: "城", icon: "mappin.and.ellipse", color: .blue)
+                }
+                
+                // 3D Quota Card
+                statCard(title: "3D 额度", value: "\(store.threeDQuota)", unit: "次", icon: "cube.transparent.fill", color: .purple)
+                    .onTapGesture {
+                        // Future: Show top-up UI
+                    }
             }
-            
-            NavigationLink(destination: MapView()) {
-                statCard(title: "已点亮", value: "\(uniqueLocationsCount)", unit: "城", icon: "mappin.and.ellipse", color: .blue)
-            }
+            .padding(.horizontal)
+            .padding(.vertical, 4) // Space for shadows
         }
-        .padding(.horizontal)
     }
     
     private func statCard(title: String, value: String, unit: String, icon: String, color: Color) -> some View {
@@ -286,16 +295,16 @@ struct PersonalView: View {
                     .foregroundColor(color)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.gray.opacity(0.3))
             }
             
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(value)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                     Text(unit)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.secondary)
                 }
                 Text(title)
@@ -304,7 +313,7 @@ struct PersonalView: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: 120, alignment: .leading)
         .background(Color.white)
         .cornerRadius(20)
         .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)

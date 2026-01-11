@@ -23,6 +23,12 @@ struct AddMagnetView: View {
     @State private var dialogHeight: CGFloat = 0
     @FocusState private var focusedField: Field?
     
+    // 3D Generation
+    @State private var shouldGenerate3D = false
+    @State private var isGenerating3D = false
+    @State private var conversionProgress: Double = 0
+    @State private var statusMessage: String = ""
+    
     enum Field {
         case name
         case notes
@@ -148,6 +154,49 @@ struct AddMagnetView: View {
                             .cornerRadius(14)
                             .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 4)
                         }
+                        
+                        // 3D Generation Toggle
+                        VStack(spacing: 8) {
+                            Button(action: {
+                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                impact.impactOccurred()
+                                if store.threeDQuota > 0 || shouldGenerate3D {
+                                    shouldGenerate3D.toggle()
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "cube.transparent.fill")
+                                        .foregroundColor(shouldGenerate3D ? .purple : .gray.opacity(0.4))
+                                                                        
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("同步生成 3D 模型")
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundColor(shouldGenerate3D ? .primary : .gray)
+                                        
+                                        Text(store.threeDQuota > 0 ? "剩余额度: \(store.threeDQuota) 次" : "额度已用完")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(store.threeDQuota > 0 ? .secondary : .red)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Toggle("", isOn: $shouldGenerate3D)
+                                        .labelsHidden()
+                                        .tint(.purple)
+                                        .disabled(store.threeDQuota <= 0)
+                                }
+                                .padding(.horizontal, 20)
+                                .frame(width: 280, height: 64)
+                                .background(shouldGenerate3D ? Color.purple.opacity(0.05) : Color.white.opacity(0.6))
+                                .cornerRadius(16)
+                                .shadow(color: .black.opacity(0.02), radius: 5, x: 0, y: 2)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(shouldGenerate3D ? Color.purple.opacity(0.2) : Color.clear, lineWidth: 1)
+                                )
+                            }
+                        }
+                        .padding(.top, 8)
                     }
                     .padding(.bottom, 20)
                     
@@ -217,6 +266,50 @@ struct AddMagnetView: View {
                         .padding(.bottom, 44)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
+                }
+                
+                // 3D Generation Progress Overlay
+                if isGenerating3D {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+                    
+                    VStack(spacing: 20) {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 4)
+                                .frame(width: 80, height: 80)
+                            
+                            Circle()
+                                .trim(from: 0, to: conversionProgress)
+                                .stroke(
+                                    LinearGradient(colors: [.purple, .blue], startPoint: .top, endPoint: .bottom),
+                                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                                )
+                                .frame(width: 80, height: 80)
+                                .rotationEffect(.degrees(-90))
+                            
+                            Image(systemName: "cube.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(.white)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            Text("3D 转换中...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            Text(statusMessage)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                    }
+                    .padding(30)
+                    .background(BlurView(style: .systemUltraThinMaterialDark))
+                    .cornerRadius(24)
+                    .shadow(radius: 20)
                 }
                 
                 // Centered Input Dialog (Conditional)
@@ -534,6 +627,67 @@ struct AddMagnetView: View {
     private func saveMagnet() {
         guard !name.isEmpty else { return }
         
+        if shouldGenerate3D {
+            generate3DAndSave()
+        } else {
+            completeSave(modelPath: nil)
+        }
+    }
+    
+    private func generate3DAndSave() {
+        guard store.useQuota() else { return }
+        
+        isGenerating3D = true
+        statusMessage = "正在上传图片..."
+        conversionProgress = 0.1
+        
+        Task {
+            do {
+                // 1. Prepare image
+                guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+                    throw NSError(domain: "AddMagnetView", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to prepare image data"])
+                }
+                let base64 = imageData.base64EncodedString()
+                
+                // 2. Submit Job
+                await MainActor.run { 
+                    statusMessage = "提交任务至腾讯云..."
+                    conversionProgress = 0.3
+                }
+                let jobId = try await Tencent3DService.shared.submitJob(imageBase64: base64)
+                
+                // 3. Poll Status
+                await MainActor.run {
+                    statusMessage = "AI 正在重建 3D 模型\n这可能需要 30-60 秒"
+                    conversionProgress = 0.6
+                }
+                let usdzUrlString = try await Tencent3DService.shared.pollJobStatus(jobId: jobId)
+                
+                // 4. Update UI
+                await MainActor.run {
+                    statusMessage = "转换完成！"
+                    conversionProgress = 1.0
+                }
+                
+                try? await Task.sleep(nanoseconds: 500_000_000) // Small pause for success vis
+                
+                await MainActor.run {
+                    isGenerating3D = false
+                    completeSave(modelPath: usdzUrlString)
+                }
+                
+            } catch {
+                print("❌ [AddMagnetView] 3D Generation failed: \(error)")
+                await MainActor.run {
+                    isGenerating3D = false
+                    // If failed, we save without 3D
+                    completeSave(modelPath: nil)
+                }
+            }
+        }
+    }
+    
+    private func completeSave(modelPath: String?) {
         guard let imagePath = ImageManager.shared.saveImage(image) else {
             return
         }
@@ -556,6 +710,7 @@ struct AddMagnetView: View {
             longitude: finalLon,
             imagePath: imagePath,
             gifPath: gifPath,
+            modelPath: modelPath, // Added model path
             notes: notes
         )
         

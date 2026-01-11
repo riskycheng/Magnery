@@ -316,12 +316,22 @@ struct SettingsDetailView: View {
         VStack(alignment: .leading, spacing: 28) {
             // App Identity Header
             VStack(alignment: .center, spacing: 16) {
-                Image("AppLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 84, height: 84)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: 6)
+                if let appIcon = Bundle.main.icon {
+                    Image(uiImage: appIcon)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 84, height: 84)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: 6)
+                } else {
+                    // Fallback to the manual asset or a placeholder
+                    Image("AppLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 84, height: 84)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .shadow(color: .black.opacity(0.1), radius: 12, x: 0, y: 6)
+                }
                 
                 VStack(spacing: 6) {
                     Text("Magnery")

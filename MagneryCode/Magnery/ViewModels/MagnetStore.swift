@@ -21,6 +21,9 @@ class MagnetStore: ObservableObject {
     @Published var userName: String = "收藏家"
     @Published var userAvatarPath: String? = nil
     
+    // Quota for 3D Conversion
+    @Published var threeDQuota: Int = 3
+    
     // Settings
     @Published var aiModel: AIModelType = .medium
     
@@ -29,13 +32,37 @@ class MagnetStore: ObservableObject {
     
     private let saveKey = "SavedMagnets"
     private let userKey = "UserProfile"
+    private let quotaKey = "UserQuota"
     private let settingsKey = "AppSettings"
     
     init() {
         loadMagnets()
         loadUserProfile()
+        loadQuota()
         loadSettings()
         updateSections()
+    }
+    
+    func loadQuota() {
+        if UserDefaults.standard.object(forKey: quotaKey) != nil {
+            threeDQuota = UserDefaults.standard.integer(forKey: quotaKey)
+        } else {
+            threeDQuota = 3 // Default initial quota
+            saveQuota()
+        }
+    }
+    
+    func saveQuota() {
+        UserDefaults.standard.set(threeDQuota, forKey: quotaKey)
+    }
+    
+    func useQuota() -> Bool {
+        if threeDQuota > 0 {
+            threeDQuota -= 1
+            saveQuota()
+            return true
+        }
+        return false
     }
     
     func saveUserProfile() {
