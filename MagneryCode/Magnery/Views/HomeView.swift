@@ -55,12 +55,12 @@ struct HomeView: View {
                             // Visual elements that scroll away (Camera Ring / Map)
                             ZStack {
                                 cameraButton
-                                    .opacity(homeMode == .camera ? 1 : 0)
-                                    .scaleEffect(homeMode == .camera ? 1 : 0.9)
+                                    .opacity(homeMode == .camera ? 1.0 : 0.0)
+                                    .scaleEffect(homeMode == .camera ? 1.0 : 0.9)
                                 
                                 mapViewContainer
-                                    .opacity(homeMode == .map ? 1 : 0)
-                                    .scaleEffect(homeMode == .map ? 1 : 0.9)
+                                    .opacity(homeMode == .map ? 1.0 : 0.0)
+                                    .scaleEffect(homeMode == .map ? 1.0 : 0.9)
                             }
                             .frame(height: 280) 
                             .padding(.top, 90) 
@@ -133,40 +133,22 @@ struct HomeView: View {
         
         return VStack(spacing: 0) {
             ZStack {
-                // Expanded Content (Centered)
-                VStack(spacing: verticalSpacing) {
-                    Text(greeting)
-                        .font(Font.system(size: titleSize, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
-                        .scaleEffect(progress > 0.4 ? 1.0 : 0.8)
-                    
-                    HStack(spacing: 4) {
-                        Text("已收集")
-                        Text("\(store.magnets.count)")
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                        Text("个冰箱贴")
-                    }
-                    .font(Font.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.secondary.opacity(0.8))
-                }
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-                .opacity(progress > 0.4 ? (progress - 0.4) * 2.5 : 0)
+                // Expanded Title (Centered, No Icon, No Stats Line)
+                Text(greeting)
+                    .font(Font.system(size: titleSize, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+                    .scaleEffect(progress > 0.4 ? 1.0 : 0.8)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .opacity(progress > 0.4 ? Double((progress - 0.4) * 2.5) : 0.0)
                 
                 // Docked Content (Centered)
-                VStack(spacing: 1) {
-                    Text(store.userName)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                    
-                    Text("\(store.magnets.count) Collections")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(.secondary)
-                }
-                .opacity(progress < 0.35 ? 1.0 : 0.0)
-                .offset(y: 5) // Slightly adjust for visual balance
+                Text(store.userName)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .opacity(progress < 0.35 ? 1.0 : 0.0)
+                    .offset(y: 5)
                 
-                // Camera Button (Right Aligned)
+                // Camera Button (Only shows when docked)
                 HStack {
                     Spacer()
                     Button(action: { 
@@ -176,9 +158,9 @@ struct HomeView: View {
                     }) {
                         ZStack {
                             Circle()
-                                .fill(isDocked ? .white : .clear)
+                                .fill(.white)
                                 .frame(width: 40, height: 40)
-                                .shadow(color: .black.opacity(isDocked ? 0.08 : 0), radius: 8)
+                                .shadow(color: .black.opacity(0.08), radius: 8)
                             
                             Image(systemName: "camera.viewfinder")
                                 .font(.system(size: 20, weight: .semibold))
@@ -186,6 +168,8 @@ struct HomeView: View {
                         }
                     }
                     .padding(.trailing, 24)
+                    .opacity(progress < 0.3 ? Double((0.3 - progress) * 3) : 0.0)
+                    .scaleEffect(progress < 0.3 ? 1.0 : 0.8)
                 }
             }
             .padding(.top, 60)
@@ -204,7 +188,7 @@ struct HomeView: View {
                     .fill(Color.black.opacity(0.05))
                     .frame(height: 0.5)
                     .frame(maxHeight: .infinity, alignment: .bottom)
-                    .opacity(isDocked ? 1 : 0)
+                    .opacity(isDocked ? 1.0 : 0.0)
             )
         }
         .ignoresSafeArea(edges: .top)
@@ -325,7 +309,7 @@ struct HomeView: View {
                         Circle()
                             .fill(Color(red: 0.1, green: 0.75, blue: 0.5))
                             .frame(width: 8, height: 8)
-                            .opacity(pulseOpacity > 0.2 ? 1 : 0.5)
+                            .opacity(pulseOpacity > 0.2 ? 1.0 : 0.5)
                     }
                 }
             }

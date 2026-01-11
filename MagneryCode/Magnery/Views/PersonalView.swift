@@ -267,56 +267,111 @@ struct PersonalView: View {
     }
     
     private var statsSection: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 15) {
             NavigationLink(destination: ListView()) {
-                simpleStatCard(title: "已收藏", value: "\(store.magnets.count)", unit: "个", color: .orange, icon: "archivebox.fill")
+                modernStatCard(
+                    title: "已收藏",
+                    value: "\(store.magnets.count)",
+                    unit: "个",
+                    icon: "archivebox.fill",
+                    colors: [.orange, .yellow]
+                )
             }
             .buttonStyle(PlainButtonStyle())
             
             NavigationLink(destination: MapView()) {
-                simpleStatCard(title: "已点亮", value: "\(uniqueLocationsCount)", unit: "城", color: .blue, icon: "map.fill")
+                modernStatCard(
+                    title: "已点亮",
+                    value: "\(uniqueLocationsCount)",
+                    unit: "城",
+                    icon: "map.fill",
+                    colors: [.blue, .cyan]
+                )
             }
             .buttonStyle(PlainButtonStyle())
             
             NavigationLink(destination: QuotaShopView()) {
-                simpleStatCard(title: "3D额度", value: "\(store.threeDQuota)", unit: "次", color: .purple, icon: "cube.fill")
+                modernStatCard(
+                    title: "3D额度",
+                    value: "\(store.threeDQuota)",
+                    unit: "次",
+                    icon: "cube.fill",
+                    colors: [.purple, .indigo]
+                )
             }
             .buttonStyle(PlainButtonStyle())
         }
         .padding(.horizontal)
     }
     
-    private func simpleStatCard(title: String, value: String, unit: String, color: Color, icon: String) -> some View {
-        VStack(spacing: 8) {
+    private func modernStatCard(title: String, value: String, unit: String, icon: String, colors: [Color]) -> some View {
+        VStack(spacing: 12) {
+            // Icon with Gradient Background
             ZStack {
                 Circle()
-                    .fill(color.opacity(0.1))
-                    .frame(width: 42, height: 42)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: colors.map { $0.opacity(0.15) }),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 46, height: 46)
+                
                 Image(systemName: icon)
-                    .font(.system(size: 18))
-                    .foregroundColor(color)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            gradient: Gradient(colors: colors),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
+            .padding(.top, 4)
             
             VStack(spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(value)
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                     Text(unit)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.secondary)
                 }
                 
                 Text(title)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary.opacity(0.8))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary.opacity(0.7))
             }
+            .padding(.bottom, 2)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(Color.white)
-        .cornerRadius(18)
-        .shadow(color: .black.opacity(0.02), radius: 8, x: 0, y: 4)
+        .padding(.vertical, 14)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color.white)
+                
+                // Subtle corner accent
+                VStack {
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(colors[0].opacity(0.05))
+                            .frame(width: 40, height: 40)
+                            .offset(x: 10, y: -10)
+                    }
+                    Spacer()
+                }
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(Color.black.opacity(0.03), lineWidth: 0.5)
+        )
     }
     
     private var settingsSection: some View {
