@@ -24,6 +24,12 @@ struct DetailView: View {
     @State private var isCollecting = false
     @StateObject private var downloadManager = DownloadManager()
     
+    // 3D Generation in Detail
+    @State private var isGenerating3D = false
+    @State private var conversionProgress: Double = 0
+    @State private var statusMessage: String = ""
+    @State private var showing3DQuotaAlert = false
+    
     private var isCommunityMagnet: Bool {
         currentMagnet.imagePath.hasPrefix("http")
     }
@@ -239,6 +245,57 @@ struct DetailView: View {
                 showingEditSheet = false
             })
         }
+        .alert("额度不足", isPresented: $showing3DQuotaAlert) {
+            Button("确定", role: .cancel) { }
+        } message: {
+            Text("您的 3D 重建额度已用完，请在个人中心充值。")
+        }
+        .overlay {
+            if isGenerating3D {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 20) {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 4)
+                                .frame(width: 80, height: 80)
+                            
+                            Circle()
+                                .trim(from: 0, to: conversionProgress)
+                                .stroke(
+                                    LinearGradient(colors: [.purple, .blue], startPoint: .top, endPoint: .bottom),
+                                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                                )
+                                .frame(width: 80, height: 80)
+                                .rotationEffect(.degrees(-90))
+                            
+                            Image(systemName: "cube.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(.white)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            Text("3D 转换中...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            Text(statusMessage)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                    }
+                    .padding(30)
+                    .background(BlurView(style: .systemUltraThinMaterialDark))
+                    .cornerRadius(24)
+                    .shadow(radius: 20)
+                }
+                .transition(.opacity)
+            }
+        }
         .alert("确认删除", isPresented: $showingDeleteConfirmation) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
@@ -328,6 +385,17 @@ struct DetailView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             } else {
+                if currentMagnet.modelPath == nil {
+                    // Generate 3D Button
+                    Button(action: {
+                        showingEditMenu = false
+                        start3DGeneration()
+                    }) {
+                        menuButtonOverlay(icon: "cube.transparent.fill", color: .purple, size: buttonSize)
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+                
                 // Edit Button
                 Button(action: {
                     showingEditMenu = false
@@ -385,6 +453,85 @@ struct DetailView: View {
             groupItems = group.items.sorted { $0.date > $1.date }
         } else {
             groupItems = []
+        }
+    }
+    
+    private func start3DGeneration() {
+        guard !isGenerating3D else { return }
+        
+        // 1. Check Quota
+        guard store.threeDQuota > 0 else {
+            showing3DQuotaAlert = true
+            return
+        }
+        
+        // 2. Get Image
+        guard !currentMagnet.imagePath.hasPrefix("http"),
+              let image = ImageManager.shared.loadImage(filename: currentMagnet.imagePath) else {
+            // Cannot generate 3D for community magnets or missing images
+            return
+        }
+        
+        isGenerating3D = true
+        statusMessage = "准备图像..."
+        conversionProgress = 0.1
+        
+        Task {
+            do {
+                // 1. Prepare Base64
+                guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+                    throw NSError(domain: "DetailView", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to process image data"])
+                }
+                let base64 = imageData.base64EncodedString()
+                
+                // 2. Submit Job
+                let useProMode = store.threeDMode == .pro
+                await MainActor.run { 
+                    statusMessage = "提交\(useProMode ? "专业版" : "极速版")任务..."
+                    conversionProgress = 0.3
+                }
+                let jobId = try await Tencent3DService.shared.submitJob(imageBase64: base64, useProMode: useProMode)
+                
+                // 3. Poll Status
+                await MainActor.run {
+                    statusMessage = "AI 正在重建 3D 模型\n这可能需要 \(useProMode ? "3-5 分钟" : "30-60 秒")"
+                    conversionProgress = 0.6
+                }
+                var usdzUrlString = try await Tencent3DService.shared.pollJobStatus(jobId: jobId, useProMode: useProMode)
+                
+                // 4. Finalize
+                await MainActor.run {
+                    statusMessage = "转换完成！"
+                    conversionProgress = 1.0
+                }
+                
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                
+                // Actually we should download the model to local storage to persist it
+                if let url = URL(string: usdzUrlString) {
+                    let tempURL = try await downloadManager.download(url: url, to: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".usdz"))
+                    if let savedName = ImageManager.shared.saveFile(from: tempURL, extension: "usdz") {
+                        usdzUrlString = savedName
+                    }
+                }
+                
+                await MainActor.run {
+                    // Update the magnet in store
+                    _ = store.useQuota()
+                    currentMagnet.modelPath = usdzUrlString
+                    store.updateMagnet(currentMagnet)
+                    isGenerating3D = false
+                    
+                    let impact = UINotificationFeedbackGenerator()
+                    impact.notificationOccurred(.success)
+                }
+                
+            } catch {
+                print("❌ [DetailView] 3D Generation failed: \(error)")
+                await MainActor.run {
+                    isGenerating3D = false
+                }
+            }
         }
     }
     

@@ -267,56 +267,56 @@ struct PersonalView: View {
     }
     
     private var statsSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                NavigationLink(destination: ListView()) {
-                    statCard(title: "已收藏", value: "\(store.magnets.count)", unit: "个", icon: "square.grid.2x2.fill", color: .orange)
-                }
-                
-                NavigationLink(destination: MapView()) {
-                    statCard(title: "已点亮", value: "\(uniqueLocationsCount)", unit: "城", icon: "mappin.and.ellipse", color: .blue)
-                }
-                
-                // 3D Quota Card
-                statCard(title: "3D 额度", value: "\(store.threeDQuota)", unit: "次", icon: "cube.transparent.fill", color: .purple)
-                    .onTapGesture {
-                        // Future: Show top-up UI
-                    }
+        HStack(spacing: 12) {
+            NavigationLink(destination: ListView()) {
+                simpleStatCard(title: "已收藏", value: "\(store.magnets.count)", unit: "个", color: .orange, icon: "archivebox.fill")
             }
-            .padding(.horizontal)
-            .padding(.vertical, 4) // Space for shadows
+            .buttonStyle(PlainButtonStyle())
+            
+            NavigationLink(destination: MapView()) {
+                simpleStatCard(title: "已点亮", value: "\(uniqueLocationsCount)", unit: "城", color: .blue, icon: "map.fill")
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            NavigationLink(destination: QuotaShopView()) {
+                simpleStatCard(title: "3D额度", value: "\(store.threeDQuota)", unit: "次", color: .purple, icon: "cube.fill")
+            }
+            .buttonStyle(PlainButtonStyle())
         }
+        .padding(.horizontal)
     }
     
-    private func statCard(title: String, value: String, unit: String, icon: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
+    private func simpleStatCard(title: String, value: String, unit: String, color: Color, icon: String) -> some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.1))
+                    .frame(width: 42, height: 42)
                 Image(systemName: icon)
+                    .font(.system(size: 18))
                     .foregroundColor(color)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.gray.opacity(0.3))
             }
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text(value)
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
                     Text(unit)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
                 }
+                
                 Text(title)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary.opacity(0.8))
             }
         }
-        .padding(16)
-        .frame(width: 120, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
         .background(Color.white)
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+        .cornerRadius(18)
+        .shadow(color: .black.opacity(0.02), radius: 8, x: 0, y: 4)
     }
     
     private var settingsSection: some View {
@@ -389,6 +389,86 @@ struct PersonalView: View {
                             Divider().padding(.leading, 60)
                         }
                     }
+                }
+                .background(Color.white)
+                .cornerRadius(20)
+                .padding(.horizontal)
+                .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
+            }
+            
+            // Section: 3D Reconstruction Mode
+            VStack(alignment: .leading, spacing: 12) {
+                Text("3D 重建设置")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .padding(.horizontal)
+                
+                VStack(spacing: 1) {
+                    ForEach(ThreeDMode.allCases, id: \.self) { mode in
+                        Button(action: {
+                            withAnimation {
+                                store.threeDMode = mode
+                                store.saveSettings()
+                            }
+                        }) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(mode.rawValue)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.primary)
+                                    Text(mode == .rapid ? "速度较快，生成效率高 (约 20-30s)" : "细节更丰富，专业级建模 (约 40-60s)")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                if store.threeDMode == mode {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.purple)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(Color.white)
+                        }
+                        
+                        if mode != ThreeDMode.allCases.last {
+                            Divider().padding(.leading, 16)
+                        }
+                    }
+                    
+                    Divider().padding(.leading, 16)
+                    
+                    // Top-up Button Entry
+                    NavigationLink(destination: QuotaShopView()) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(LinearGradient(gradient: Gradient(colors: [.orange, .yellow]), startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 38, height: 38)
+                                    .shadow(color: .orange.opacity(0.3), radius: 4, x: 0, y: 2)
+                                
+                                Image(systemName: "sparkles.tv.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 18))
+                            }
+                            .padding(.leading, 16)
+                            
+                            Text("获取更多额度")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.gray.opacity(0.5))
+                                .padding(.trailing, 16)
+                        }
+                        .padding(.vertical, 14)
+                        .background(Color.white)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 .background(Color.white)
                 .cornerRadius(20)

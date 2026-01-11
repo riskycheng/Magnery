@@ -21,6 +21,7 @@ struct HomeView: View {
     @State private var homeMode: HomeMode = .camera
     @State private var hasTriggeredHaptic = false
     @State private var selectedGroupForNavigation: MagnetGroup?
+    @State private var selectedMagnetForNavigation: MagnetItem?
     @State private var lastAddedIdForNavigation: UUID?
     @State private var rippleScale: CGFloat = 1.0
     @State private var rippleOpacity: Double = 0.0
@@ -106,13 +107,14 @@ struct HomeView: View {
             .navigationDestination(item: $selectedGroupForNavigation) { group in
                 ListView(group: group, scrollToGroup: true, scrollToItemId: lastAddedIdForNavigation)
             }
+            .navigationDestination(item: $selectedMagnetForNavigation) { magnet in
+                DetailView(magnet: magnet)
+            }
             .onChange(of: store.lastAddedMagnetId) { oldValue, newValue in
                 if let newId = newValue {
-                    // Find the group this magnet belongs to
-                    let groups = store.groupedMagnets()
-                    if let group = groups.first(where: { g in g.items.contains(where: { $0.id == newId }) }) {
-                        lastAddedIdForNavigation = newId
-                        selectedGroupForNavigation = group
+                    // Navigate directly to DetailView for the new item
+                    if let magnet = store.magnets.first(where: { $0.id == newId }) {
+                        selectedMagnetForNavigation = magnet
                     }
                     // Reset the ID in store so we don't trigger again
                     store.lastAddedMagnetId = nil

@@ -13,6 +13,11 @@ struct SectionData: Identifiable, Equatable {
     }
 }
 
+enum ThreeDMode: String, Codable, CaseIterable {
+    case rapid = "极速版"
+    case pro = "专业版"
+}
+
 @MainActor
 class MagnetStore: ObservableObject {
     @Published var magnets: [MagnetItem] = []
@@ -26,6 +31,7 @@ class MagnetStore: ObservableObject {
     
     // Settings
     @Published var aiModel: AIModelType = .medium
+    @Published var threeDMode: ThreeDMode = .rapid
     
     // Cache for grouped sections to improve performance
     @Published var sections: [SectionData] = []
@@ -79,8 +85,9 @@ class MagnetStore: ObservableObject {
     }
     
     func saveSettings() {
-        let settings = [
-            "aiModel": aiModel.rawValue
+        let settings: [String: String] = [
+            "aiModel": aiModel.rawValue,
+            "threeDMode": threeDMode.rawValue
         ]
         UserDefaults.standard.set(settings, forKey: settingsKey)
     }
@@ -91,6 +98,12 @@ class MagnetStore: ObservableObject {
                 aiModel = model
             } else {
                 aiModel = .medium
+            }
+            
+            if let modeRaw = settings["threeDMode"] as? String, let mode = ThreeDMode(rawValue: modeRaw) {
+                threeDMode = mode
+            } else {
+                threeDMode = .rapid
             }
         }
     }

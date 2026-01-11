@@ -173,9 +173,19 @@ struct AddMagnetView: View {
                                             .font(.system(size: 15, weight: .semibold))
                                             .foregroundColor(shouldGenerate3D ? .primary : .gray)
                                         
-                                        Text(store.threeDQuota > 0 ? "剩余额度: \(store.threeDQuota) 次" : "额度已用完")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(store.threeDQuota > 0 ? .secondary : .red)
+                                        HStack(spacing: 4) {
+                                            Text(store.threeDMode == .pro ? "专业版" : "极速版")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(store.threeDMode == .pro ? Color.purple : Color.blue)
+                                                .foregroundColor(.white)
+                                                .cornerRadius(4)
+                                            
+                                            Text(store.threeDQuota > 0 ? "剩余额度: \(store.threeDQuota) 次" : "额度已用完")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(store.threeDQuota > 0 ? .secondary : .red)
+                                        }
                                     }
                                     
                                     Spacer()
@@ -650,18 +660,19 @@ struct AddMagnetView: View {
                 let base64 = imageData.base64EncodedString()
                 
                 // 2. Submit Job
+                let useProMode = store.threeDMode == .pro
                 await MainActor.run { 
-                    statusMessage = "提交任务至腾讯云..."
+                    statusMessage = "提交\(useProMode ? "专业版" : "极速版")任务..."
                     conversionProgress = 0.3
                 }
-                let jobId = try await Tencent3DService.shared.submitJob(imageBase64: base64)
+                let jobId = try await Tencent3DService.shared.submitJob(imageBase64: base64, useProMode: useProMode)
                 
                 // 3. Poll Status
                 await MainActor.run {
-                    statusMessage = "AI 正在重建 3D 模型\n这可能需要 30-60 秒"
+                    statusMessage = "AI 正在重建 3D 模型\n这可能需要 \(useProMode ? "3-5 分钟" : "30-60 秒")"
                     conversionProgress = 0.6
                 }
-                let usdzUrlString = try await Tencent3DService.shared.pollJobStatus(jobId: jobId)
+                let usdzUrlString = try await Tencent3DService.shared.pollJobStatus(jobId: jobId, useProMode: useProMode)
                 
                 // 4. Update UI
                 await MainActor.run {

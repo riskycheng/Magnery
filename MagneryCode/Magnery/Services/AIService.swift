@@ -3,7 +3,7 @@ import Network
 import SwiftUI
 import Combine
 
-enum AIModelType: String, CaseIterable {
+enum AIModelType: String, CaseIterable, Codable {
     case easy = "基础版 (7B)"
     case medium = "专业版 (8B)"
     case powerful = "旗舰版 (30B)"

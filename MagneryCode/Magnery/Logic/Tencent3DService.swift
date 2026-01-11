@@ -14,8 +14,8 @@ class Tencent3DService {
     private init() {}
     
     /// Submits a job to generate a 3D model from an image
-    func submitJob(imageBase64: String) async throws -> String {
-        let action = "SubmitHunyuanTo3DRapidJob"
+    func submitJob(imageBase64: String, useProMode: Bool = false) async throws -> String {
+        let action = useProMode ? "SubmitHunyuanTo3DJob" : "SubmitHunyuanTo3DRapidJob"
         let payload: [String: Any] = [
             "ImageBase64": imageBase64,
             "ResultFormat": "USDZ",
@@ -41,14 +41,14 @@ class Tencent3DService {
     }
     
     /// Polls the job status until it's finished or failed
-    func pollJobStatus(jobId: String) async throws -> String {
-        let action = "QueryHunyuanTo3DRapidJob"
+    func pollJobStatus(jobId: String, useProMode: Bool = false) async throws -> String {
+        let action = useProMode ? "QueryHunyuanTo3DJob" : "QueryHunyuanTo3DRapidJob"
         let payload: [String: Any] = [
             "JobId": jobId
         ]
         
         var attempts = 0
-        let maxAttempts = 60 // 5 minutes max
+        let maxAttempts = useProMode ? 120 : 60 // 10 minutes max for Pro, 5 for Rapid
         
         while attempts < maxAttempts {
             let response = try await sendRequest(action: action, payload: payload)
