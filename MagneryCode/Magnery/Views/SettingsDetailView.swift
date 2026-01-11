@@ -256,6 +256,17 @@ struct SettingsDetailView: View {
                 // Section 1: Intro
                 AboutCard(title: "什么是 Magnery？", icon: "questionmark.circle.fill", color: .blue) {
                     Text("Magnery 是一款专为冰箱贴及小比例模型收藏家打造的数字化管理工具。我们利用尖端的 Vision AI 与 3D 重建技术，将您的实物收藏转化为生动的数字资产，让回忆在云端永存。")
+                        .lineSpacing(4)
+                }
+                
+                // New Section: How it works
+                AboutCard(title: "快速上手", icon: "play.circle.fill", color: .green) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        StepRow(number: "1", text: "拍摄或导入您的收藏品照片")
+                        StepRow(number: "2", text: "AI 自动识别背景并生成 3D 模型")
+                        StepRow(number: "3", text: "在地图或 AR 中浏览并开启语音对话")
+                    }
+                    .padding(.top, 4)
                 }
                 
                 // Section 2: Features
@@ -271,47 +282,37 @@ struct SettingsDetailView: View {
                 
                 // Section 3: Tech Stack
                 AboutCard(title: "技术驱动", icon: "cpu.fill", color: .red) {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Magnery 集成了业界领先的技术方案：")
-                        Text("• **Vision SDK**: 实现毫秒级的端侧抠图与识别。")
-                        Text("• **Hunyuan3D**: 腾讯混元大模型驱动的 3D 重建。")
-                        Text("• **SiliconFlow**: 强大的 LLM 知识库与播报支持。")
+                            .font(.system(size: 14, weight: .medium))
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            TechTag(name: "Vision SDK", desc: "实现毫秒级端侧抠图与识别")
+                            TechTag(name: "Hunyuan3D", desc: "腾讯混元大模型驱动的 3D 重建")
+                            TechTag(name: "SiliconFlow", desc: "强大的 LLM 知识库与播报支持")
+                        }
                     }
                 }
                 
                 // Section 4: Vision
                 AboutCard(title: "我们的愿景", icon: "eye.fill", color: .purple) {
                     Text("连接现实与数字，赋予实物以灵魂。每一枚冰箱贴都承载着一段旅程。在 Magnery，我们不仅记录收藏，更在编织您跨越山海的人生印记。")
+                        .lineSpacing(4)
                 }
                 
-                // Section 5: Community & Feedback
-                AboutCard(title: "加入我们", icon: "person.2.fill", color: .indigo) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("如果您有任何创意想法，或想探索更多冰箱贴背后的故事，欢迎加入我们的社区。")
-                        HStack(spacing: 20) {
-                            Link(destination: URL(string: "mailto:riskycheng@gmail.com")!) {
-                                Label("反馈建议", systemImage: "envelope.fill")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                        }
-                    }
-                }
-                
-                // Bottom Links / Footer
-                VStack(spacing: 12) {
-                    Divider()
-                        .padding(.vertical, 8)
-                        
-                    Text("Made with ❤️ for Collectors")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                // Professional Footer
+                VStack(spacing: 8) {
+                    Text("Designed with ❤️ in Shanghai")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary.opacity(0.6))
-                        
+                    
                     Text("© 2026 Magnery Team. All Rights Reserved.")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary.opacity(0.4))
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.top, 10)
+                .padding(.top, 20)
+                .padding(.bottom, 40)
             }
         }
     }
@@ -587,6 +588,48 @@ struct FeatureRow: View {
             Text(text)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.primary.opacity(0.85))
+        }
+    }
+}
+
+// MARK: - About Page Helpers
+
+struct StepRow: View {
+    let number: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(number)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 18, height: 18)
+                .background(Circle().fill(Color.green))
+            
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+struct TechTag: View {
+    let name: String
+    let desc: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(name)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(.blue)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(4)
+            
+            Text(desc)
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
         }
     }
 }
