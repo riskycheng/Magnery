@@ -13,6 +13,8 @@ struct SettingsDetailView: View {
                     termsOfServiceContent
                 } else if title == "常见问题" {
                     faqContent
+                } else if title == "意见反馈" {
+                    feedbackContent
                 } else if title == "关于 Magnery" {
                     aboutMagneryContent
                 } else {
@@ -216,6 +218,97 @@ struct SettingsDetailView: View {
                     answer: "非常欢迎您的反馈！您可以通过“个人中心-意见反馈”直接发送邮件，或联系我们的支持邮箱：riskycheng@gmail.com。我们会认真阅读每一封来信。"
                 )
             }
+        }
+    }
+    
+    private var feedbackContent: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            // Header
+            VStack(alignment: .leading, spacing: 12) {
+                Text("期待您的声音")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                
+                Text("您的每一个反馈都是我们进步的动力。无论是发现 Bug，还是有关于新功能的奇思妙想，都欢迎随时告诉我们。")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineSpacing(6)
+            }
+            .padding(.bottom, 8)
+            
+            // Main Contact Method
+            AboutCard(title: "通过邮件联系我们", icon: "envelope.circle.fill", color: .blue) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("这是我们目前主要的服务与交流通道，我们将直接通过邮件与您沟通。")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                    
+                    Link(destination: URL(string: "mailto:riskycheng@gmail.com")!) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("支持邮箱")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.blue.opacity(0.8))
+                                Text("riskycheng@gmail.com")
+                                    .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.primary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue)
+                        }
+                        .padding(16)
+                        .background(Color.blue.opacity(0.05))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+                }
+            }
+            
+            // Guidelines
+            AboutCard(title: "反馈小贴士", icon: "lightbulb.fill", color: .orange) {
+                VStack(alignment: .leading, spacing: 14) {
+                    FeedbackTipRow(icon: "text.justify.left", text: "尽可能详细地描述您遇到的问题或建议场景")
+                    FeedbackTipRow(icon: "iphone", text: "附上您的设备型号（如 iPhone 15 Pro）")
+                    FeedbackTipRow(icon: "photo.on.rectangle", text: "如有必要，提供相关问题的截图或录屏")
+                }
+                .padding(.top, 4)
+            }
+            
+            // Promise
+            AboutCard(title: "我们的承诺", icon: "heart.fill", color: .red) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("每一个真实反馈，我们都会：")
+                        .font(.system(size: 14, weight: .medium))
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Text("•")
+                                .foregroundColor(.red)
+                            Text("由开发者直接阅读并跟进")
+                        }
+                        HStack(spacing: 8) {
+                            Text("•")
+                                .foregroundColor(.red)
+                            Text("在 24-48 小时内给予初步回复")
+                        }
+                        HStack(spacing: 8) {
+                            Text("•")
+                                .foregroundColor(.red)
+                            Text("对于被采纳的创意，记录在致谢名单中")
+                        }
+                    }
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer(minLength: 40)
         }
     }
     
@@ -630,6 +723,26 @@ struct TechTag: View {
             Text(desc)
                 .font(.system(size: 12))
                 .foregroundColor(.secondary)
+        }
+    }
+}
+
+struct FeedbackTipRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.secondary)
+                .font(.system(size: 14))
+                .frame(width: 20, alignment: .center)
+                .padding(.top, 2)
+            
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
