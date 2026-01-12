@@ -15,11 +15,11 @@ class Tencent3DService {
     
     /// Submits a job to generate a 3D model from an image
     func submitJob(imageBase64: String, useProMode: Bool = false) async throws -> String {
-        let action = useProMode ? "SubmitHunyuanTo3DJob" : "SubmitHunyuanTo3DRapidJob"
+        let action = useProMode ? "SubmitHunyuanTo3DProJob" : "SubmitHunyuanTo3DRapidJob"
         let payload: [String: Any] = [
             "ImageBase64": imageBase64,
             "ResultFormat": "USDZ",
-            "EnablePBR": true
+            "EnablePBR": useProMode // Enable PBR (extra 10 credits) only in Pro mode
         ]
         
         let response = try await sendRequest(action: action, payload: payload)
@@ -42,7 +42,7 @@ class Tencent3DService {
     
     /// Polls the job status until it's finished or failed
     func pollJobStatus(jobId: String, useProMode: Bool = false) async throws -> String {
-        let action = useProMode ? "QueryHunyuanTo3DJob" : "QueryHunyuanTo3DRapidJob"
+        let action = useProMode ? "QueryHunyuanTo3DProJob" : "QueryHunyuanTo3DRapidJob"
         let payload: [String: Any] = [
             "JobId": jobId
         ]

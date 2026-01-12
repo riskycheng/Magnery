@@ -27,7 +27,7 @@ class MagnetStore: ObservableObject {
     @Published var userAvatarPath: String? = nil
     
     // Quota for 3D Conversion
-    @Published var threeDQuota: Int = 3
+    @Published var threeDQuota: Int = 100
     
     // Settings
     @Published var aiModel: AIModelType = .medium
@@ -53,7 +53,7 @@ class MagnetStore: ObservableObject {
         if UserDefaults.standard.object(forKey: quotaKey) != nil {
             threeDQuota = UserDefaults.standard.integer(forKey: quotaKey)
         } else {
-            threeDQuota = 3 // Default initial quota
+            threeDQuota = 100 // Default initial quota for debugging
             saveQuota()
         }
     }
