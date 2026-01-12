@@ -84,8 +84,10 @@ struct CameraView: View {
     var body: some View {
         ZStack {
             if cameraManager.isAuthorized {
-                CameraPreviewView(session: cameraManager.session)
-                    .ignoresSafeArea()
+                CameraPreviewView(session: cameraManager.session) { point in
+                    cameraManager.focus(at: point)
+                }
+                .ignoresSafeArea()
                 
                 if cameraManager.isRecording {
                     Color.red.opacity(0.1)

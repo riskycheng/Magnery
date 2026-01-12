@@ -62,7 +62,17 @@ class CameraManager: NSObject, ObservableObject {
             self.session.inputs.forEach { self.session.removeInput($0) }
             self.session.outputs.forEach { self.session.removeOutput($0) }
             
-            guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+            // Search for the best available camera (supporting Macro if available)
+            let deviceTypes: [AVCaptureDevice.DeviceType] = [
+                .builtInTripleCamera,
+                .builtInDualWideCamera,
+                .builtInDualCamera,
+                .builtInWideAngleCamera
+            ]
+            
+            let discoverySession = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: .video, position: .back)
+            
+            guard let device = discoverySession.devices.first,
                   let input = try? AVCaptureDeviceInput(device: device) else {
                 self.session.commitConfiguration()
                 return
@@ -88,6 +98,47 @@ class CameraManager: NSObject, ObservableObject {
             
             self.session.commitConfiguration()
             self.isConfigured = true
+            self.enableContinuousAutoFocus()
+        }
+    }
+    
+    private func enableContinuousAutoFocus() {
+        guard let device = (session.inputs.first as? AVCaptureDeviceInput)?.device else { return }
+        do {
+            try device.lockForConfiguration()
+            if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+            }
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+            device.unlockForConfiguration()
+        } catch {
+            print("Could not lock device for configuration: \(error)")
+        }
+    }
+    
+    func focus(at devicePoint: CGPoint) {
+        sessionQueue.async { [weak self] in
+            guard let self = self,
+                  let device = (self.session.inputs.first as? AVCaptureDeviceInput)?.device else { return }
+            do {
+                try device.lockForConfiguration()
+                
+                if device.isFocusPointOfInterestSupported && device.isFocusModeSupported(.autoFocus) {
+                    device.focusPointOfInterest = devicePoint
+                    device.focusMode = .autoFocus
+                }
+                
+                if device.isExposurePointOfInterestSupported && device.isExposureModeSupported(.autoExpose) {
+                    device.exposurePointOfInterest = devicePoint
+                    device.exposureMode = .autoExpose
+                }
+                
+                device.unlockForConfiguration()
+            } catch {
+                print("Could not lock device for focus: \(error)")
+            }
         }
     }
     
