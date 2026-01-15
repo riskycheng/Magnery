@@ -247,7 +247,6 @@ struct DetailView: View {
             }
         }
         .setTabBarVisibility(false)
-        .toolbar(.hidden, for: .tabBar)
         .onAppear {
             loadGroupItems()
         }
@@ -288,42 +287,7 @@ struct DetailView: View {
                     Color.black.opacity(0.4)
                         .ignoresSafeArea()
                     
-                    VStack(spacing: 20) {
-                        ZStack {
-                            Circle()
-                                .stroke(Color.white.opacity(0.2), lineWidth: 4)
-                                .frame(width: 80, height: 80)
-                            
-                            Circle()
-                                .trim(from: 0, to: conversionProgress)
-                                .stroke(
-                                    LinearGradient(colors: [.purple, .blue], startPoint: .top, endPoint: .bottom),
-                                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                                )
-                                .frame(width: 80, height: 80)
-                                .rotationEffect(.degrees(-90))
-                            
-                            Image(systemName: "cube.fill")
-                                .font(.system(size: 30))
-                                .foregroundColor(.white)
-                        }
-                        
-                        VStack(spacing: 8) {
-                            Text("3D 转换中...")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            
-                            Text(statusMessage)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
-                        }
-                    }
-                    .padding(30)
-                    .background(BlurView(style: .systemUltraThinMaterialDark))
-                    .cornerRadius(24)
-                    .shadow(radius: 20)
+                    ThreeDProgressView(progress: conversionProgress, status: statusMessage)
                 }
                 .transition(.opacity)
             }
@@ -561,9 +525,25 @@ struct DetailView: View {
                 // 3. Poll Status
                 await MainActor.run {
                     statusMessage = "AI 正在重建 3D 模型\n这可能需要 \(useProMode ? "3-5 分钟" : "30-60 秒")"
-                    conversionProgress = 0.6
+                    conversionProgress = 0.4
                 }
+                
+                // Start a background task to slowly increment progress so user doesn't think it's stuck
+                let progressTask = Task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 2 * 1_000_000_000) // Every 2 seconds
+                        await MainActor.run {
+                            if conversionProgress < 0.9 {
+                                withAnimation {
+                                    conversionProgress += 0.01
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 var usdzUrlString = try await Tencent3DService.shared.pollJobStatus(jobId: jobId, useProMode: useProMode)
+                progressTask.cancel()
                 
                 // 4. Finalize
                 await MainActor.run {

@@ -37,14 +37,23 @@ struct MainTabView: View {
                     HomeView(selectedTab: $selectedTab)
                         .frame(width: proxy.size.width)
                         .allowsHitTesting(selectedTab == .home)
+                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
+                            if selectedTab != .home { value = true }
+                        }
                     
                     CommunityView()
                         .frame(width: proxy.size.width)
                         .allowsHitTesting(selectedTab == .community)
+                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
+                            if selectedTab != .community { value = true }
+                        }
                     
                     PersonalView()
                         .frame(width: proxy.size.width)
                         .allowsHitTesting(selectedTab == .personal)
+                        .transformPreference(TabBarVisibilityPreferenceKey.self) { value in
+                            if selectedTab != .personal { value = true }
+                        }
                 }
                 .offset(x: -CGFloat(selectedTab.index) * proxy.size.width)
             }

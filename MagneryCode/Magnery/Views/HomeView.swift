@@ -99,8 +99,8 @@ struct HomeView: View {
                     headerLayer
                         .zIndex(1)
                 }
+                .setTabBarVisibility(true)
             }
-            .setTabBarVisibility(true)
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraView()
             }

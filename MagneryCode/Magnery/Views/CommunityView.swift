@@ -70,8 +70,8 @@ struct CommunityView: View {
                         .transition(.opacity)
                     }
                 }
+                .setTabBarVisibility(true)
             }
-            .setTabBarVisibility(true)
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $selectedMagnet) { magnet in
                 DetailView(magnet: magnet)

@@ -67,8 +67,8 @@ struct PersonalView: View {
                     headerLayer
                         .zIndex(1)
                 }
+                .setTabBarVisibility(true)
             }
-            .setTabBarVisibility(true)
             .navigationBarTitleDisplayMode(.inline)
             .onChange(of: selectedItem) { newItem in
                 guard let newItem = newItem else { return }
