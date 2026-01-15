@@ -722,7 +722,8 @@ struct AddMagnetView: View {
         
         Task {
             do {
-                let modelType = store.aiModel
+                // Use the most efficient model for initial capture to reduce waiting time
+                let modelType = AIModelType.easy
                 let generatedNotes = try await AIService.shared.generateCaption(
                     itemName: name,
                     location: location,
