@@ -22,8 +22,9 @@ class CameraManager: NSObject, ObservableObject {
     private var isConfigured = false
     
     private var frameCounter = 0
-    private let maxFrames = 600 // 60 seconds at 10fps
+    private let maxFrames = 150 // Reduced from 600 to prevent OOM. 15 seconds at 10fps is plenty for a GIF.
     private var processedResults: [Int: UIImage] = [:]
+    private var completedProcessingCount = 0
     private var totalCapturedCount = 0
     
     override init() {
@@ -162,6 +163,7 @@ class CameraManager: NSObject, ObservableObject {
             self.capturedFrames = []
             self.segmentedFrames = []
             self.processedResults = [:]
+            self.completedProcessingCount = 0
             self.totalCapturedCount = 0
             self.isRecording = true
             self.isProcessingFrames = true // Start showing processing state immediately
@@ -173,14 +175,19 @@ class CameraManager: NSObject, ObservableObject {
     func stopRecording() {
         DispatchQueue.main.async {
             self.isRecording = false
-            self.checkProcessingCompletion()
+            // Check if already finished (e.g., recorded 0 frames)
+            if self.totalCapturedCount == 0 {
+                self.isProcessingFrames = false
+            } else {
+                self.checkProcessingCompletion()
+            }
         }
     }
     
     private func checkProcessingCompletion() {
-        if !isRecording && processedResults.count == totalCapturedCount && totalCapturedCount > 0 {
+        if !isRecording && completedProcessingCount >= totalCapturedCount && totalCapturedCount > 0 {
             // All frames processed
-            let sortedFrames = processedResults.keys.sorted().compactMap { processedResults[$0] }
+            let sortedFrames = (0..<totalCapturedCount).compactMap { processedResults[$0] }
             self.segmentedFrames = sortedFrames
             self.isProcessingFrames = false
         }
@@ -190,12 +197,14 @@ class CameraManager: NSObject, ObservableObject {
         processingQueue.async {
             VisionService.shared.segmentAndNormalize(image: image) { segmentedImage in
                 DispatchQueue.main.async {
+                    self.completedProcessingCount += 1
+                    
                     if let segmented = segmentedImage {
                         self.processedResults[index] = segmented
                     }
                     
                     if self.totalCapturedCount > 0 {
-                        self.processingProgress = Double(self.processedResults.count) / Double(self.totalCapturedCount)
+                        self.processingProgress = Double(self.completedProcessingCount) / Double(self.totalCapturedCount)
                     }
                     
                     self.checkProcessingCompletion()
@@ -237,6 +246,7 @@ class CameraManager: NSObject, ObservableObject {
             self.capturedFrames = []
             self.segmentedFrames = []
             self.processedResults = [:]
+            self.completedProcessingCount = 0
             self.totalCapturedCount = 0
         }
 
@@ -323,7 +333,13 @@ extension CameraManager: AVCaptureVideoDataOutputSampleBufferDelegate {
         guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
         let ciImage = CIImage(cvPixelBuffer: imageBuffer)
         let context = CIContext()
-        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
+        
+        // Scale down to a reasonable size (e.g., 800px on the long side) to save memory
+        // Most GIFs and preview segmentations don't need 4K resolution
+        let scale = 800.0 / max(ciImage.extent.width, ciImage.extent.height)
+        let scaledImage = ciImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        
+        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else { return nil }
         // Since videoOrientation is set to .portrait, the buffer is already portrait.
         // Use .up to avoid double rotation.
         return UIImage(cgImage: cgImage, scale: 1.0, orientation: .up)
