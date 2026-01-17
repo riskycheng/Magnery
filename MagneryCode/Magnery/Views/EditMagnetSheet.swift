@@ -167,7 +167,8 @@ struct EditMagnetSheet: View {
         
         Task {
             do {
-                let modelType = store.aiModel
+                // Captions (notes) always use the most efficient model regardless of settings
+                let modelType = AIModelType.easy
                 let generatedNotes = try await AIService.shared.generateCaption(
                     itemName: editedName,
                     location: magnet.location,
