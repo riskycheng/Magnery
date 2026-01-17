@@ -292,9 +292,9 @@ struct PersonalView: View {
             
             NavigationLink(destination: QuotaShopView()) {
                 modernStatCard(
-                    title: "3D额度",
+                    title: "3D积分",
                     value: "\(store.threeDQuota)",
-                    unit: "次",
+                    unit: "个",
                     icon: "cube.fill",
                     colors: [.purple, .indigo]
                 )
@@ -470,7 +470,7 @@ struct PersonalView: View {
                                     Text(mode.rawValue)
                                         .font(.system(size: 16, weight: .medium))
                                         .foregroundColor(.primary)
-                                    Text(mode == .rapid ? "速度较快，生成效率高 (约 20-30s)" : "细节更丰富，专业级建模 (约 40-60s)")
+                                    Text(mode == .rapid ? "速度较快，耗时约 20-30s (消耗 1 积分)" : "细节更丰富，耗时约 50-60s (消耗 2 积分)")
                                         .font(.system(size: 12))
                                         .foregroundColor(.secondary)
                                 }
@@ -509,7 +509,7 @@ struct PersonalView: View {
                             }
                             .padding(.leading, 16)
                             
-                            Text("获取更多额度")
+                            Text("获取更多积分")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.primary)
                             

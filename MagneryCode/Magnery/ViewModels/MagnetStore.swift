@@ -26,8 +26,8 @@ class MagnetStore: ObservableObject {
     @Published var userName: String = "收藏家"
     @Published var userAvatarPath: String? = nil
     
-    // Quota for 3D Conversion
-    @Published var threeDQuota: Int = 100
+    // Quota for 3D Conversion (Credits)
+    @Published var threeDQuota: Int = 10
     
     // Settings
     @Published var aiModel: AIModelType = .medium
@@ -53,7 +53,7 @@ class MagnetStore: ObservableObject {
         if UserDefaults.standard.object(forKey: quotaKey) != nil {
             threeDQuota = UserDefaults.standard.integer(forKey: quotaKey)
         } else {
-            threeDQuota = 100 // Default initial quota for debugging
+            threeDQuota = 10 // New user starting with 10 credits
             saveQuota()
         }
     }
@@ -62,9 +62,10 @@ class MagnetStore: ObservableObject {
         UserDefaults.standard.set(threeDQuota, forKey: quotaKey)
     }
     
-    func useQuota() -> Bool {
-        if threeDQuota > 0 {
-            threeDQuota -= 1
+    func useQuota(mode: ThreeDMode) -> Bool {
+        let cost = mode == .pro ? 2 : 1
+        if threeDQuota >= cost {
+            threeDQuota -= cost
             saveQuota()
             return true
         }

@@ -490,7 +490,8 @@ struct DetailView: View {
         guard !isGenerating3D else { return }
         
         // 1. Check Quota
-        guard store.threeDQuota > 0 else {
+        let cost = store.threeDMode == .pro ? 2 : 1
+        guard store.threeDQuota >= cost else {
             showing3DQuotaAlert = true
             return
         }
@@ -524,7 +525,7 @@ struct DetailView: View {
                 
                 // 3. Poll Status
                 await MainActor.run {
-                    statusMessage = "AI 正在重建 3D 模型\n这可能需要 \(useProMode ? "3-5 分钟" : "30-60 秒")"
+                    statusMessage = "AI 正在重建 3D 模型\n这可能需要 \(useProMode ? "50-60 秒" : "20-30 秒")"
                     conversionProgress = 0.4
                 }
                 
@@ -563,7 +564,7 @@ struct DetailView: View {
                 
                 await MainActor.run {
                     // Update the magnet in store
-                    _ = store.useQuota()
+                    _ = store.useQuota(mode: store.threeDMode)
                     currentMagnet.modelPath = usdzUrlString
                     store.updateMagnet(currentMagnet)
                     isGenerating3D = false

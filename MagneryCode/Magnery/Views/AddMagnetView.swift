@@ -182,7 +182,7 @@ struct AddMagnetView: View {
                                                 .foregroundColor(.white)
                                                 .cornerRadius(4)
                                             
-                                            Text(store.threeDQuota > 0 ? "剩余额度: \(store.threeDQuota) 次" : "额度已用完")
+                                            Text(store.threeDQuota > 0 ? "剩余额度: \(store.threeDQuota) 积分" : "积分已用完")
                                                 .font(.system(size: 11))
                                                 .foregroundColor(store.threeDQuota > 0 ? .secondary : .red)
                                         }
@@ -193,7 +193,7 @@ struct AddMagnetView: View {
                                     Toggle("", isOn: $shouldGenerate3D)
                                         .labelsHidden()
                                         .tint(.purple)
-                                        .disabled(store.threeDQuota <= 0)
+                                        .disabled(store.threeDQuota < (store.threeDMode == .pro ? 2 : 1))
                                 }
                                 .padding(.horizontal, 20)
                                 .frame(width: 280, height: 64)
@@ -610,7 +610,8 @@ struct AddMagnetView: View {
     }
     
     private func generate3DAndSave() {
-        guard store.useQuota() else { return }
+        let cost = store.threeDMode == .pro ? 2 : 1
+        guard store.threeDQuota >= cost else { return }
         
         isGenerating3D = true
         statusMessage = "正在上传图片..."
@@ -634,7 +635,7 @@ struct AddMagnetView: View {
                 
                 // 3. Poll Status
                 await MainActor.run {
-                    statusMessage = "AI 正在重建 3D 模型\n这可能需要 \(useProMode ? "3-5 分钟" : "30-60 秒")"
+                    statusMessage = "AI 正在重建 3D 模型\n这可能需要 \(useProMode ? "50-60 秒" : "20-30 秒")"
                     conversionProgress = 0.4
                 }
                 
@@ -664,6 +665,7 @@ struct AddMagnetView: View {
                 try? await Task.sleep(nanoseconds: 500_000_000) // Small pause for success vis
                 
                 await MainActor.run {
+                    _ = store.useQuota(mode: store.threeDMode)
                     isGenerating3D = false
                     completeSave(modelPath: usdzUrlString)
                 }

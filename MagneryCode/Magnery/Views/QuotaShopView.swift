@@ -5,10 +5,13 @@ struct QuotaShopView: View {
     @Environment(\.dismiss) var dismiss
     
     let packages = [
-        QuotaPackage(id: "quota_small", name: "基础包", quota: 10, price: "¥6.00", icon: "sparkles", color: .blue),
-        QuotaPackage(id: "quota_medium", name: "超值包", quota: 30, price: "¥12.00", icon: "sparkles.rectangle.stack", color: .purple, isPopular: true),
-        QuotaPackage(id: "quota_large", name: "专业包", quota: 100, price: "¥30.00", icon: "crown.fill", color: .orange)
+        QuotaPackage(id: "quota_small", name: "基础包", quota: 4, price: "¥6.00", icon: "sparkles", color: .blue),
+        QuotaPackage(id: "quota_medium", name: "超值包", quota: 10, price: "¥12.00", icon: "sparkles.rectangle.stack", color: .purple, isPopular: true),
+        QuotaPackage(id: "quota_large", name: "专业包", quota: 20, price: "¥25.00", icon: "crown.fill", color: .orange)
     ]
+    
+    @State private var showingCustomAmountAlert = false
+    @State private var customAmount = ""
     
     var body: some View {
         ScrollView {
@@ -27,7 +30,7 @@ struct QuotaShopView: View {
                     Text("获取 3D 重建额度")
                         .font(.system(size: 24, weight: .bold, design: .rounded))
                     
-                    Text("当前剩余额度: \(store.threeDQuota) 次")
+                    Text("当前剩余额度: \(store.threeDQuota) 积分")
                         .font(.system(size: 16))
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 12)
@@ -42,16 +45,19 @@ struct QuotaShopView: View {
                     ForEach(packages) { package in
                         packageRow(package)
                     }
+                    
+                    customAmountRow
                 }
                 .padding(.horizontal)
                 
                 // Info
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("关于额度")
+                    Text("关于积分")
                         .font(.headline)
                     
-                    bulletPoint("专业版 3D 重建消耗 1 个额度，极速版不消耗额度（Beta 期间临时策略）。")
-                    bulletPoint("购买后的额度永久有效，不设过期时间。")
+                    bulletPoint("专业版 3D 重建消耗 2 个积分，极速版消耗 1 个积分。")
+                    bulletPoint("新用户首次登录将获得 10 个初始积分。")
+                    bulletPoint("购买后的积分永久有效，不设过期时间。")
                     bulletPoint("由于 3D 生成需要消耗大量云端算力，建议在光线充足、背景简单的环境下拍摄以获得最佳效果。")
                 }
                 .padding()
@@ -64,15 +70,72 @@ struct QuotaShopView: View {
         }
         .navigationTitle("商店")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("任意积分购买", isPresented: $showingCustomAmountAlert) {
+            TextField("输入要购买的积分数量", text: $customAmount)
+                .keyboardType(.numberPad)
+            Button("取消", role: .cancel) { }
+            Button("准备购买") {
+                if let amount = Int(customAmount) {
+                    // In real app, trigger payment
+                    // For now, it's "Coming Soon" behavior too or just mock
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                }
+            }
+        } message: {
+            Text("请输入您想要购买的积分数量。")
+        }
+    }
+    
+    private var customAmountRow: some View {
+        Button(action: {
+            showingCustomAmountAlert = true
+        }) {
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.green.opacity(0.1))
+                        .frame(width: 50, height: 50)
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(.green)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("自定义数量")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.primary)
+                    
+                    Text("输入您需要的任意积分数")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                Text("前往")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.green, lineWidth: 1)
+                    )
+            }
+            .padding(16)
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 4)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     private func packageRow(_ package: QuotaPackage) -> some View {
         Button(action: {
-            // Mock purchase
-            store.threeDQuota += package.quota
-            store.saveQuota()
-            let impact = UINotificationFeedbackGenerator()
-            impact.notificationOccurred(.success)
+            // No action as it's "Coming Soon"
+            let impact = UIImpactFeedbackGenerator(style: .light)
+            impact.impactOccurred()
         }) {
             HStack(spacing: 16) {
                 ZStack {
@@ -101,19 +164,19 @@ struct QuotaShopView: View {
                         }
                     }
                     
-                    Text("\(package.quota) 次 3D 重建额度")
+                    Text("\(package.quota) 个 3D 重建积分")
                         .font(.system(size: 14))
                         .foregroundColor(.secondary)
                 }
                 
                 Spacer()
                 
-                Text(package.price)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
+                Text("即将到来")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(package.color)
+                    .background(Color.secondary.opacity(0.1))
                     .cornerRadius(20)
             }
             .padding(16)
