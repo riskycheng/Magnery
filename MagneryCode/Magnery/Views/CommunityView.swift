@@ -9,7 +9,24 @@ struct CommunityView: View {
     @State private var initialOffset: CGFloat? = nil
     @State private var isCollapsed = false
     @State private var lastScrollUpdate: CGFloat = 0
+    @Environment(\.horizontalSizeClass) var sizeClass
+    
     private let scrollUpdateThreshold: CGFloat = 1
+    
+    private var columns: [GridItem] {
+        if sizeClass == .regular {
+            return [
+                GridItem(.flexible(), spacing: 20),
+                GridItem(.flexible(), spacing: 20),
+                GridItem(.flexible(), spacing: 20)
+            ]
+        } else {
+            return [
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16)
+            ]
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -194,7 +211,7 @@ struct CommunityView: View {
     }
     
     private var contentGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 20) {
+        LazyVGrid(columns: columns, spacing: sizeClass == .regular ? 32 : 20) {
             if communityService.popularMagnets.isEmpty && communityService.isLoading {
                 // Initial loading state: Show 6 skeletons
                 ForEach(0..<6, id: \.self) { index in
@@ -309,44 +326,45 @@ struct CommunityView: View {
     }
     
     private func communityCard(magnet: CommunityMagnet) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let cardWidth = (UIScreen.main.bounds.width - (sizeClass == .regular ? 80 : 48)) / (sizeClass == .regular ? 3 : 2)
+        let imageHeight = cardWidth // Make it square
+        
+        return VStack(alignment: .leading, spacing: 12) {
             ZStack {
                 // Persistent background to prevent layout shifts
                 RoundedRectangle(cornerRadius: 24)
                     .fill(Color.gray.opacity(0.1))
                     .shadow(color: .black.opacity(0.03), radius: 10, x: 0, y: 4)
                 
-                Group {
-                    // Always show the cover image in the list view
-                    ZStack(alignment: .topTrailing) {
-                        CachedAsyncImage(url: magnet.imageURL, fallbackURLs: magnet.imageFallbackURLs)
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipped()
-                        
-                        // Add badges for special types
-                        if magnet.modelName != nil {
-                            Image(systemName: "arkit")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(6)
-                                .background(Color.blue.opacity(0.8))
-                                .clipShape(Circle())
-                                .padding(8)
-                        } else if magnet.gifName != nil {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(6)
-                                .background(Color.black.opacity(0.6))
-                                .clipShape(Circle())
-                                .padding(8)
-                        }
+                // Content with restricted frame and clipping
+                ZStack(alignment: .topTrailing) {
+                    CachedAsyncImage(url: magnet.imageURL, fallbackURLs: magnet.imageFallbackURLs)
+                        .aspectRatio(contentMode: .fit) // Changed to .fit to avoid truncation
+                        .padding(20) // Add some padding so the magnet doesn't touch the edges
+                        .frame(width: cardWidth, height: imageHeight)
+                    
+                    // Add badges for special types
+                    if magnet.modelName != nil {
+                        Image(systemName: "arkit")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(6)
+                            .background(Color.blue.opacity(0.8))
+                            .clipShape(Circle())
+                            .padding(12)
+                    } else if magnet.gifName != nil {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(6)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                            .padding(12)
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 24))
             }
-            .frame(height: 180)
+            .frame(width: cardWidth, height: imageHeight)
             
             // Fixed-height text container to prevent layout jumps
             VStack(alignment: .leading, spacing: 8) {

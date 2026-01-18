@@ -9,6 +9,7 @@ struct HomeView: View {
     @EnvironmentObject var store: MagnetStore
     @Binding var selectedTab: Tab
     @Namespace private var modeNamespace
+    @Environment(\.horizontalSizeClass) var sizeClass
     @State private var showingCamera = false
     @State private var ringRotation: Double = 0
     @State private var dotScale: CGFloat = 1.0
@@ -37,6 +38,10 @@ struct HomeView: View {
     private let maxHeaderHeight: CGFloat = 360
     private let scrollUpdateThreshold: CGFloat = 1  // Reduced threshold
     
+    private var isIPad: Bool {
+        sizeClass == .regular
+    }
+    
     private var visualProgress: CGFloat {
         let rawProgress = 1.0 + (scrollOffset / 150.0)
         return min(1.0, max(0.0, rawProgress))
@@ -62,8 +67,8 @@ struct HomeView: View {
                                     .opacity(homeMode == .map ? 1.0 : 0.0)
                                     .scaleEffect(homeMode == .map ? 1.0 : 0.9)
                             }
-                            .frame(height: 280) 
-                            .padding(.top, 90) 
+                            .frame(height: isIPad ? 380 : 280) 
+                            .padding(.top, isIPad ? 120 : 90) 
                             .opacity(visualProgress)
                             .scaleEffect(0.85 + (0.15 * visualProgress))
                             .animation(.spring(response: 0.5, dampingFraction: 0.8), value: homeMode)
@@ -239,7 +244,7 @@ struct HomeView: View {
     private var mapViewContainer: some View {
         MapView()
             .frame(maxWidth: .infinity)
-            .frame(height: 280)
+            .frame(height: isIPad ? 380 : 280)
             .clipShape(RoundedRectangle(cornerRadius: 32))
             .overlay(
                 RoundedRectangle(cornerRadius: 32)
@@ -250,7 +255,11 @@ struct HomeView: View {
     }
     
     private var cameraButton: some View {
-        ZStack {
+        let baseSize: CGFloat = isIPad ? 180 : 130
+        let ringSize: CGFloat = isIPad ? 140 : 100
+        let iconSize: CGFloat = isIPad ? 72 : 52
+        
+        return ZStack {
             // Background Tap Area for "Water Surface" ripples
             Color.clear
                 .contentShape(Rectangle())
@@ -262,7 +271,7 @@ struct HomeView: View {
             ForEach(0..<3) { i in
                 Circle()
                     .stroke(Color.black.opacity(0.06), lineWidth: 1)
-                    .frame(width: 120, height: 120)
+                    .frame(width: ringSize * 1.2, height: ringSize * 1.2)
                     .scaleEffect(pulseScale + CGFloat(i) * 0.5)
                     .opacity(pulseOpacity * (1.0 - Double(i) * 0.3))
             }
@@ -271,7 +280,7 @@ struct HomeView: View {
             ForEach(0..<3) { i in
                 Circle()
                     .stroke(Color.black.opacity(0.15), lineWidth: 1.5)
-                    .frame(width: 130, height: 130)
+                    .frame(width: baseSize, height: baseSize)
                     .scaleEffect(rippleScale + CGFloat(i) * 0.2)
                     .opacity(rippleOpacity * (1.0 - Double(i) * 0.3))
             }
@@ -302,7 +311,7 @@ struct HomeView: View {
                     // Main Button Body - Enlarged
                     Circle()
                         .fill(.white)
-                        .frame(width: 130, height: 130)
+                        .frame(width: baseSize, height: baseSize)
                         .shadow(color: .black.opacity(0.08), radius: 35, x: 0, y: 18)
                     
                     // Rotating Focus Ring - Enlarged
@@ -312,7 +321,7 @@ struct HomeView: View {
                             LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .top, endPoint: .bottom),
                             style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                         )
-                        .frame(width: 100, height: 100)
+                        .frame(width: ringSize, height: ringSize)
                         .rotationEffect(.degrees(ringRotation))
                     
                     Circle()
@@ -321,19 +330,19 @@ struct HomeView: View {
                             LinearGradient(colors: [.black.opacity(0.2), .clear], startPoint: .bottom, endPoint: .top),
                             style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                         )
-                        .frame(width: 100, height: 100)
+                        .frame(width: ringSize, height: ringSize)
                         .rotationEffect(.degrees(-ringRotation * 0.5))
                     
                     // Minimalist Viewfinder Icon - Enlarged
                     ZStack {
                         Image(systemName: "viewfinder")
-                            .font(Font.system(size: 52, weight: .light))
+                            .font(Font.system(size: iconSize, weight: .light))
                             .foregroundColor(.black.opacity(0.8))
                             .scaleEffect(1.0 + Double(dotScale - 1.0) * 2.0)
                         
                         Circle()
                             .fill(Color(red: 0.1, green: 0.75, blue: 0.5))
-                            .frame(width: 8, height: 8)
+                            .frame(width: isIPad ? 12 : 8, height: isIPad ? 12 : 8)
                             .opacity(pulseOpacity > 0.2 ? 1.0 : 0.5)
                     }
                 }
@@ -373,38 +382,52 @@ struct HomeView: View {
                 emptyStateView
             } else {
                 ZStack(alignment: .top) {
-                    LazyVStack(alignment: .leading, spacing: 40) {
-                        ForEach(store.sections) { sectionData in
-                            VStack(alignment: .leading, spacing: 24) {
-                                if !sectionData.section.isEmpty {
-                                    Text(AttributedString(sectionData.section, attributes: AttributeContainer([
-                                        .font: Font.system(size: 12, weight: .bold, design: .monospaced),
-                                        .tracking: 3.0
-                                    ])))
-                                    .foregroundColor(.secondary.opacity(0.5))
-                                    .padding(.horizontal, 32)
-                                }
-                                
+                    if isIPad {
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 24), GridItem(.flexible(), spacing: 24)], spacing: 24) {
+                            ForEach(store.sections) { sectionData in
                                 ForEach(sectionData.groups) { group in
                                     NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
                                         GroupCard(group: group, groupingMode: store.groupingMode)
                                     }
                                     .buttonStyle(PlainButtonStyle())
-                                    .padding(.horizontal, 24)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                    } else {
+                        LazyVStack(alignment: .leading, spacing: 40) {
+                            ForEach(store.sections) { sectionData in
+                                VStack(alignment: .leading, spacing: 24) {
+                                    if !sectionData.section.isEmpty {
+                                        Text(AttributedString(sectionData.section, attributes: AttributeContainer([
+                                            .font: Font.system(size: 12, weight: .bold, design: .monospaced),
+                                            .tracking: 3.0
+                                        ])))
+                                        .foregroundColor(.secondary.opacity(0.5))
+                                        .padding(.horizontal, 32)
+                                    }
+                                    
+                                    ForEach(sectionData.groups) { group in
+                                        NavigationLink(destination: ListView(group: group, scrollToGroup: true)) {
+                                            GroupCard(group: group, groupingMode: store.groupingMode)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .padding(.horizontal, 24)
+                                    }
                                 }
                             }
                         }
                     }
-                    .id(store.groupingMode)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .bottom).combined(with: .opacity),
-                        removal: .opacity
-                    ))
                 }
-                .padding(.top, 20)
+                .id(store.groupingMode)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .opacity
+                ))
                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: store.groupingMode)
             }
         }
+        .padding(.top, 20)
         .padding(.bottom, 160)
     }
     
@@ -783,39 +806,49 @@ struct GroupCard: View {
 }
 
 struct ItemPreview: View {
+    @Environment(\.horizontalSizeClass) var sizeClass
     let item: MagnetItem
+    
+    private var size: CGFloat {
+        sizeClass == .regular ? 120 : 80
+    }
     
     var body: some View {
         ZStack {
             if let gifPath = item.gifPath {
                 NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
-                    .frame(width: 80, height: 80)
-                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: sizeClass == .regular ? 32 : 22))
             } else if let image = ImageManager.shared.loadImage(filename: item.imagePath) {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 80, height: 80)
-                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: sizeClass == .regular ? 32 : 22))
             }
         }
     }
 }
 
 struct MoreItemsView: View {
+    @Environment(\.horizontalSizeClass) var sizeClass
     let count: Int
+    
+    private var size: CGFloat {
+        sizeClass == .regular ? 120 : 80
+    }
     
     var body: some View {
         VStack(spacing: 2) {
             Text("+\(count)")
-                .font(Font.system(size: 16, weight: .bold, design: .rounded))
+                .font(Font.system(size: sizeClass == .regular ? 24 : 16, weight: .bold, design: .rounded))
             Text("MORE")
-                .font(Font.system(size: 7, weight: .black))
+                .font(Font.system(size: sizeClass == .regular ? 10 : 7, weight: .black))
         }
         .foregroundColor(.secondary.opacity(0.4))
-        .frame(width: 80, height: 80)
+        .frame(width: size, height: size)
         .background(
-            RoundedRectangle(cornerRadius: 22)
+            RoundedRectangle(cornerRadius: sizeClass == .regular ? 32 : 22)
                 .fill(Color.black.opacity(0.02))
         )
     }

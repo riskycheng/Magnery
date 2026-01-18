@@ -89,7 +89,8 @@ struct MainTabView: View {
     
     private var floatingTabBar: some View {
         GeometryReader { geometry in
-            let barWidth = max(0, geometry.size.width - 60)
+            let availableWidth = max(0, geometry.size.width - 60)
+            let barWidth = min(availableWidth, 500)
             let barHeight: CGFloat = 72
             let tabWidth = max(1, barWidth / CGFloat(Tab.allCases.count))
             

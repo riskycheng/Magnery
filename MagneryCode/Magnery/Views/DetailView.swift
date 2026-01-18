@@ -11,6 +11,7 @@ struct EllipsisButtonBoundsKey: PreferenceKey {
 struct DetailView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var store: MagnetStore
+    @Environment(\.horizontalSizeClass) var sizeClass
     let magnet: MagnetItem
     @State private var showingAIDialog = false
     @State private var showingEditMenu = false
@@ -23,6 +24,14 @@ struct DetailView: View {
     @State private var itemToShare: MagnetItem? = nil
     @State private var isCollecting = false
     @StateObject private var downloadManager = DownloadManager()
+    
+    private var isIPad: Bool {
+        sizeClass == .regular
+    }
+    
+    private var contentHeight: CGFloat {
+        isIPad ? 580 : 380
+    }
     
     // 3D Generation in Detail
     @State private var isGenerating3D = false
@@ -76,7 +85,7 @@ struct DetailView: View {
                         Model3DView(url: ImageManager.shared.getFileURL(for: modelPath))
                             .id(modelPath)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 380)
+                            .frame(height: contentHeight)
                             .transition(.asymmetric(
                                 insertion: .scale(scale: 0.8).combined(with: .opacity),
                                 removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -84,7 +93,7 @@ struct DetailView: View {
                     } else if let gifPath = currentMagnet.gifPath {
                         NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
                             .id(gifPath)
-                            .frame(maxHeight: 380)
+                            .frame(maxHeight: contentHeight)
                             .transition(.asymmetric(
                                 insertion: .scale(scale: 0.8).combined(with: .opacity),
                                 removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -108,7 +117,7 @@ struct DetailView: View {
                             }
                         }
                         .id(currentMagnet.imagePath)
-                        .frame(maxHeight: 380)
+                        .frame(maxHeight: contentHeight)
                         .transition(.asymmetric(
                             insertion: .scale(scale: 0.8).combined(with: .opacity),
                             removal: .scale(scale: 0.8).combined(with: .opacity)
@@ -134,7 +143,7 @@ struct DetailView: View {
                         }
                     }
                 }
-                .frame(height: 380)
+                .frame(height: contentHeight)
                 
                 VStack(spacing: 8) {
                     Text(currentMagnet.name)

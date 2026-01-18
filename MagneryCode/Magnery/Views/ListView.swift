@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ListView: View {
     @EnvironmentObject var store: MagnetStore
+    @Environment(\.horizontalSizeClass) var sizeClass
     let group: MagnetGroup?
     let scrollToGroup: Bool
     let scrollToItemId: UUID?
@@ -10,6 +11,25 @@ struct ListView: View {
     @State private var groups: [MagnetGroup] = []
     @State private var itemToShare: MagnetItem? = nil
     @Namespace private var scrollNamespace
+    
+    private var isIPad: Bool {
+        sizeClass == .regular
+    }
+    
+    private var columns: [GridItem] {
+        if isIPad {
+            return [
+                GridItem(.flexible(), spacing: 20),
+                GridItem(.flexible(), spacing: 20),
+                GridItem(.flexible(), spacing: 20)
+            ]
+        } else {
+            return [
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16)
+            ]
+        }
+    }
     
     init(group: MagnetGroup? = nil, scrollToGroup: Bool = false, scrollToItemId: UUID? = nil, isFavoritesOnly: Bool = false) {
         self.group = group
@@ -116,10 +136,7 @@ struct ListView: View {
     }
     
     private func magnetGrid(for group: MagnetGroup) -> some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 16),
-            GridItem(.flexible(), spacing: 16)
-        ], spacing: 16) {
+        LazyVGrid(columns: columns, spacing: isIPad ? 20 : 16) {
             ForEach(group.items.sorted { $0.date > $1.date }) { item in
                 magnetItemView(for: item)
                     .id(item.id)
@@ -263,32 +280,46 @@ struct ListView: View {
 }
 
 struct MagnetCard: View {
+    @Environment(\.horizontalSizeClass) var sizeClass
     let magnet: MagnetItem
     var isSelected: Bool = false
     var isDimmed: Bool = false
     @State private var outlineImage: UIImage? = nil
     
+    private var cardWidth: CGFloat {
+        let columns: CGFloat = sizeClass == .regular ? 3 : 2
+        let spacing: CGFloat = sizeClass == .regular ? 20 : 16
+        let padding: CGFloat = 16 * 2
+        return (UIScreen.main.bounds.width - padding - (spacing * (columns - 1))) / columns
+    }
+    
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
+                // Background card
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.white)
+                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+                
                 if let gifPath = magnet.gifPath {
                     NativeGIFView(url: ImageManager.shared.getFileURL(for: gifPath))
-                        .frame(height: 150)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                        .aspectRatio(contentMode: .fit)
+                        .padding(15)
+                        .frame(width: cardWidth, height: cardWidth)
                 } else if let image = ImageManager.shared.loadImage(filename: magnet.imagePath) {
                     ZStack {
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(height: 150)
-                            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                            .padding(15)
+                            .frame(width: cardWidth, height: cardWidth)
                         
                         if let outline = outlineImage {
                             Image(uiImage: outline)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
-                                .frame(height: 150)
+                                .padding(15)
+                                .frame(width: cardWidth, height: cardWidth)
                         }
                     }
                     .onAppear {
@@ -302,13 +333,13 @@ struct MagnetCard: View {
                         }
                     }
                 } else {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: 150)
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(width: cardWidth, height: cardWidth)
                         .overlay(
                             Image(systemName: "photo")
                                 .font(.largeTitle)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.gray.opacity(0.3))
                         )
                 }
                 
@@ -318,36 +349,35 @@ struct MagnetCard: View {
                         HStack {
                             Spacer()
                             ZStack {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(LinearGradient(gradient: Gradient(colors: [.purple, .indigo]), startPoint: .topLeading, endPoint: .bottomTrailing))
+                                Circle()
+                                    .fill(LinearGradient(gradient: Gradient(colors: [.blue, .purple]), startPoint: .topLeading, endPoint: .bottomTrailing))
                                     .frame(width: 28, height: 28)
                                     .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                                 
-                                Image(systemName: "cube.fill")
-                                    .font(.system(size: 12))
+                                Image(systemName: "arkit")
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(.white)
                             }
-                            .padding(6)
+                            .padding(12)
                         }
                         Spacer()
                     }
                 }
             }
+            .frame(width: cardWidth, height: cardWidth)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
             
             Text(magnet.name)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.black.opacity(0.05))
                 .clipShape(Capsule())
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                .lineLimit(1)
         }
-        .opacity(isDimmed ? 0.3 : 1.0)
-        .scaleEffect(isSelected ? 1.05 : 1.0)
+        .scaleEffect(isSelected ? 0.95 : 1.0)
+        .opacity(isDimmed ? 0.6 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-        .animation(.easeInOut(duration: 0.2), value: isDimmed)
     }
 }
 
