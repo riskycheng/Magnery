@@ -105,12 +105,11 @@ struct CropView: View {
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.top, max(mainGeo.safeAreaInsets.top, 44) + 5)
+                    .padding(.top, mainGeo.safeAreaInsets.top + 5)
                     .padding(.bottom, 15)
                     .background(
-                        Color.black.opacity(0.4)
-                            .background(.ultraThinMaterial.opacity(0.5))
-                            .ignoresSafeArea(edges: .top)
+                        BlurView(style: .systemUltraThinMaterialDark)
+                            .opacity(0.8)
                     )
                     .zIndex(10)
                 
@@ -383,12 +382,11 @@ struct CropView: View {
                     }
                     .foregroundColor(.white)
                     .padding(.top, 8)
-                    .padding(.bottom, max(mainGeo.safeAreaInsets.bottom, 20))
+                    .padding(.bottom, mainGeo.safeAreaInsets.bottom > 0 ? mainGeo.safeAreaInsets.bottom + 5 : 25)
                 }
                 .background(
-                    Color.black.opacity(0.6)
-                        .background(.ultraThinMaterial.opacity(0.8))
-                        .ignoresSafeArea(edges: .bottom)
+                    BlurView(style: .systemUltraThinMaterialDark)
+                        .opacity(0.9)
                 )
                 .zIndex(10)
                 .overlay(
@@ -398,6 +396,7 @@ struct CropView: View {
                         .frame(maxHeight: .infinity, alignment: .top)
                 )
             }
+            .ignoresSafeArea()
         }
     }
 }
