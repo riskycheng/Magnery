@@ -148,6 +148,17 @@ struct DetailView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 40)
                     }
+                    
+                    // Categories
+                    if let l1 = currentMagnet.categoryLevel1 {
+                        HStack(spacing: 8) {
+                            categoryTag(l1, color: .blue)
+                            if let l2 = currentMagnet.categoryLevel2 {
+                                categoryTag(l2, color: .purple)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
                 }
                 .padding(.top, 24)
                 
@@ -354,6 +365,16 @@ struct DetailView: View {
                 proxy.scrollTo(currentMagnet.id, anchor: .center)
             }
         }
+    }
+    
+    private func categoryTag(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .foregroundColor(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.1))
+            .clipShape(Capsule())
     }
     
     private var circularMenuButtons: some View {
@@ -685,7 +706,9 @@ struct DetailView: View {
                     imagePath: localMagnet.imagePath,
                     gifPath: localMagnet.gifPath,
                     modelPath: localMagnet.modelPath,
-                    notes: localMagnet.notes
+                    notes: localMagnet.notes,
+                    categoryLevel1: localMagnet.categoryLevel1,
+                    categoryLevel2: localMagnet.categoryLevel2
                 )
                 
                 store.addMagnet(finalMagnet)

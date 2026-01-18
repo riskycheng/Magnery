@@ -14,6 +14,8 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
     var notes: String
     var isFavorite: Bool? = false
     var cachedIntroduction: String?
+    var categoryLevel1: String?
+    var categoryLevel2: String?
     
     var favoriteStatus: Bool {
         isFavorite ?? false
@@ -89,7 +91,7 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
         return URL(string: path)
     }
     
-    init(id: UUID = UUID(), name: String, date: Date = Date(), location: String = "未知位置", latitude: Double? = nil, longitude: Double? = nil, imagePath: String, gifPath: String? = nil, modelPath: String? = nil, notes: String = "") {
+    init(id: UUID = UUID(), name: String, date: Date = Date(), location: String = "未知位置", latitude: Double? = nil, longitude: Double? = nil, imagePath: String, gifPath: String? = nil, modelPath: String? = nil, notes: String = "", categoryLevel1: String? = nil, categoryLevel2: String? = nil) {
         self.id = id
         self.name = name
         self.date = date
@@ -100,6 +102,8 @@ struct MagnetItem: Identifiable, Codable, Equatable, Hashable {
         self.gifPath = gifPath
         self.modelPath = modelPath
         self.notes = notes
+        self.categoryLevel1 = categoryLevel1
+        self.categoryLevel2 = categoryLevel2
     }
 }
 

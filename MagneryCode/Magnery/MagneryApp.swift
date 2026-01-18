@@ -10,11 +10,17 @@ import SwiftUI
 @main
 struct MagneryApp: App {
     @StateObject private var store = MagnetStore()
+    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     
     var body: some Scene {
         WindowGroup {
-            MainTabView()
-                .environmentObject(store)
+            if !hasCompletedOnboarding {
+                OnboardingView()
+                    .environmentObject(store)
+            } else {
+                MainTabView()
+                    .environmentObject(store)
+            }
         }
     }
 }

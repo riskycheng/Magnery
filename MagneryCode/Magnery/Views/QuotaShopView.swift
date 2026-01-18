@@ -89,7 +89,9 @@ struct QuotaShopView: View {
     
     private var customAmountRow: some View {
         Button(action: {
-            showingCustomAmountAlert = true
+            // showingCustomAmountAlert = true
+            let impact = UIImpactFeedbackGenerator(style: .light)
+            impact.impactOccurred()
         }) {
             HStack(spacing: 16) {
                 ZStack {
@@ -113,15 +115,13 @@ struct QuotaShopView: View {
                 
                 Spacer()
                 
-                Text("前往")
+                Text("即将到来")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.green)
-                    .padding(.horizontal, 16)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.green, lineWidth: 1)
-                    )
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(20)
             }
             .padding(16)
             .background(Color.white)

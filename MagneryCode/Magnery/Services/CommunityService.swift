@@ -19,6 +19,8 @@ struct CommunityMagnet: Identifiable, Codable {
     let gifName: String?
     let modelName: String?
     let date: Date
+    let categoryLevel1: String?
+    let categoryLevel2: String?
     
     var imageURL: URL? {
         let base = CommunityConfig.baseURL
@@ -110,7 +112,9 @@ struct CommunityMagnet: Identifiable, Codable {
             imagePath: imageURL?.absoluteString ?? "",
             gifPath: gifURL?.absoluteString,
             modelPath: modelURL?.absoluteString,
-            notes: notes
+            notes: notes,
+            categoryLevel1: categoryLevel1,
+            categoryLevel2: categoryLevel2
         )
     }
 }
