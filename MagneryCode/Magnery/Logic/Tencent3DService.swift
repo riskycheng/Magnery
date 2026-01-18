@@ -4,14 +4,30 @@ import CryptoKit
 class Tencent3DService {
     static let shared = Tencent3DService()
     
-    private let secretId = "AKIDFuUtVvHRN90kKlJj4Wv9B2iDZkmg9Qcc"
-    private let secretKey = "rX6SeeSZZRAnMNCFCyiWBdswoU0MVSEm"
+    private var secretId: String {
+        fetchSecret(named: "TencentSecretId")
+    }
+    
+    private var secretKey: String {
+        fetchSecret(named: "TencentSecretKey")
+    }
+    
     private let service = "ai3d"
     private let host = "ai3d.tencentcloudapi.com"
     private let version = "2025-05-13"
     private let region = "ap-guangzhou"
     
     private init() {}
+    
+    private func fetchSecret(named key: String) -> String {
+        guard let path = Bundle.main.path(forResource: "Secrets", ofType: "plist"),
+              let dict = NSDictionary(contentsOfFile: path),
+              let value = dict[key] as? String else {
+            print("⚠️ [Tencent3DService] Missing secret for key: \(key). Please check Secrets.plist")
+            return ""
+        }
+        return value
+    }
     
     /// Submits a job to generate a 3D model from an image
     func submitJob(imageBase64: String, useProMode: Bool = false) async throws -> String {
